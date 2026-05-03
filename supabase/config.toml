@@ -1,0 +1,7 @@
+project_id = "wukrbjkbhktdlukanwgl"
+
+[functions.tts-eleven]
+verify_jwt = false
+
+[functions.music-eleven]
+verify_jwt = false
