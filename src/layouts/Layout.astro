@@ -9,6 +9,8 @@ interface Props {
   ogDescription?: string;
   ogImage?: string;
   ogType?: string;
+  /** Schema.org Product when merged from Shopify Storefront */
+  jsonLd?: Record<string, unknown> | null;
 }
 
 const {
@@ -19,6 +21,7 @@ const {
   ogDescription,
   ogImage = "https://celsiusherbs.com/cdn/shop/files/dermveda-yeast-infection-treatment_jpg_1024x1024.png",
   ogType = "website",
+  jsonLd,
 } = Astro.props;
 
 const resolvedOgTitle = ogTitle ?? title;
@@ -49,6 +52,12 @@ const resolvedOgDescription = ogDescription ?? description;
     <meta property="og:image" content={ogImage} />
 
     <meta name="twitter:card" content="summary_large_image" />
+
+    {
+      jsonLd && (
+        <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+      )
+    }
   </head>
   <body>
     <slot />

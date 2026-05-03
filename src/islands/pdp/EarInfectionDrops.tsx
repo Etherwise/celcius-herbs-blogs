@@ -1,5 +1,5 @@
 import PageRoot from "@/components/PageRoot";
-import EarInfectionDrops from "@/views/EarInfectionDrops";
+import EarInfectionDrops from "@/views/pdp/EarInfectionDrops";
 
 export default function EarInfectionDropsIsland() {
   return (
