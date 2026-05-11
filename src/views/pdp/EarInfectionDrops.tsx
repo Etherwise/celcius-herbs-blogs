@@ -5,6 +5,12 @@ import {
   ChevronRight, ChevronLeft, Stethoscope, ShieldCheck, Microscope, Pill, Droplet,
   HeartHandshake, AlertCircle, Clock, PawPrint, Ear, Wind, DollarSign,
 } from "lucide-react";
+import { useStore } from "@nanostores/react";
+import { handleAddToCartRule } from "@/lib/shopify/cart-actions";
+import { getProduct, type ProductVariant } from "@/lib/shopify/storefront";
+import { $shopifyCart, hydrateShopifyCart } from "@/lib/shopify/cart-store";
+import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
@@ -45,6 +51,9 @@ import bundleMiticide from "@/assets/petglow-ear-miticide.png";
  */
 
 type GalleryImage = { src: string; alt: string };
+
+/** Shopify product handle — see Admin → Products → URL & SEO. */
+const PDP_PRODUCT_NAME = "natural-dog-ear-cleanser-infection";
 
 const PRODUCT_IMAGES: GalleryImage[] = [
   { src: earHero, alt: "PetGlow natural ear infection drops bottle with olive leaf and chamomile" },
@@ -232,10 +241,26 @@ const EarInfectionDrops = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [pack, setPack] = useState<"single" | "bundle">("bundle");
   const [qty, setQty] = useState(1);
+  const [, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
+  const [isAdding, setIsAdding] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
-  const singlePrice = 36.89;
-  const bundleOriginal = +(singlePrice * 2).toFixed(2);
-  const bundlePrice = +(bundleOriginal * 0.8).toFixed(2);
+  useEffect(() => {
+    getProduct(PDP_PRODUCT_NAME).then((p) => { if (p) setVariants(p.variants); });
+  }, []);
+
+  const fullVariant = variants[0];
+  const bundleVariant = variants.find((v) => {
+    const packOpt = v.selectedOptions.find((o) => o.name.toLowerCase() === "pack" || o.name.toLowerCase() === "size");
+    if (!packOpt) return false;
+    const val = packOpt.value.toLowerCase();
+    return val.startsWith("2") || val.includes("bundle") || val.includes("2-pack") || val.includes("twin");
+  });
+  const isBundleAvailable = !!bundleVariant?.availableForSale;
+  const singlePrice = fullVariant ? parseFloat(fullVariant.price.amount) : 36.89;
+  const bundlePrice = bundleVariant ? parseFloat(bundleVariant.price.amount) : +(singlePrice * 2 * 0.8).toFixed(2);
+  const bundleOriginal = bundleVariant?.compareAtPrice ? parseFloat(bundleVariant.compareAtPrice.amount) : +(singlePrice * 2).toFixed(2);
   const finalPrice = pack === "bundle" ? bundlePrice : singlePrice;
 
   const [showStickyBar, setShowStickyBar] = useState(false);
@@ -246,8 +271,34 @@ const EarInfectionDrops = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    void hydrateShopifyCart();
+  }, []);
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await handleAddToCartRule({
+        productName: PDP_PRODUCT_NAME,
+        size: pack === "bundle" ? "bundle" : "full",
+        purchase: "once",
+        qty,
+        cart,
+      });
+      setCartOpen(true);
+    } catch (err) {
+      console.error("Cart error:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <CartDrawer />
       {/* Announcement */}
       <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
         FDA-registered · Vet-trusted · Free 3-day shipping in the USA
@@ -268,9 +319,13 @@ const EarInfectionDrops = () => {
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
             <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
             <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart">
+            <button type="button" className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">0</span>
+              {(cart?.totalQuantity ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
+                  {cart!.totalQuantity}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -371,7 +426,7 @@ const EarInfectionDrops = () => {
                 </div>
                 <span className="text-sm font-medium whitespace-nowrap">${singlePrice.toFixed(2)}</span>
               </button>
-              <button onClick={() => setPack("bundle")} className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50")}>
+              <button onClick={() => isBundleAvailable && setPack("bundle")} disabled={!isBundleAvailable} className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50", !isBundleAvailable && "opacity-50 cursor-not-allowed")}>
                 <div className="flex items-center gap-3">
                   <span className={cn("h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0", pack === "bundle" ? "border-foreground" : "border-muted-foreground")}>
                     {pack === "bundle" && <span className="h-2 w-2 rounded-full bg-foreground" />}
@@ -400,8 +455,12 @@ const EarInfectionDrops = () => {
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium">
-              Add to Bag · ${(finalPrice * qty).toFixed(2)}
+            <Button
+              className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+              onClick={handleAddToCart}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
             </Button>
           </div>
 
@@ -1104,8 +1163,14 @@ const EarInfectionDrops = () => {
               )}
             </div>
           </div>
-          <Button size="sm" className="rounded-full px-4 h-10 text-[11px] tracking-[0.16em] uppercase bg-ink-deep text-primary-foreground hover:bg-ink-deep/90 shrink-0">
-            Add to Bag
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-full px-4 h-10 text-[11px] tracking-[0.16em] uppercase bg-ink-deep text-primary-foreground hover:bg-ink-deep/90 shrink-0"
+            onClick={handleAddToCart}
+            disabled={isAdding}
+          >
+            {isAdding ? "Adding…" : "Add to Bag"}
           </Button>
         </div>
       </div>

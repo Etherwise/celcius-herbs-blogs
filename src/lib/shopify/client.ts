@@ -2,21 +2,42 @@ import { createStorefrontApiClient, type StorefrontApiClient } from "@shopify/st
 
 let cached: StorefrontApiClient | null | undefined;
 
-function storefrontConfigured(): boolean {
-  const domain = import.meta.env.PUBLIC_SHOPIFY_STORE_DOMAIN?.trim();
-  const token = import.meta.env.PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN?.trim();
-  return Boolean(domain && token);
+function normalizeStoreDomain(rawDomain: string): string | null {
+  const trimmedDomain = rawDomain.trim();
+  const withoutProtocol = trimmedDomain.replace(/^https?:\/\//i, "");
+  const sanitizedDomain = withoutProtocol.replace(/^\/+|\/+$/g, "");
+
+  if (!sanitizedDomain || sanitizedDomain.includes("/")) {
+    console.error(
+      "[shopify] PUBLIC_SHOPIFY_STORE_DOMAIN is invalid. Use only the store domain without 'https://' or extra slashes.",
+    );
+    return null;
+  }
+
+  return sanitizedDomain;
 }
 
 export function getStorefrontClient(): StorefrontApiClient | null {
   if (cached !== undefined) return cached;
-  if (!storefrontConfigured()) {
+  const domainEnv = import.meta.env.PUBLIC_SHOPIFY_STORE_DOMAIN?.trim();
+  const tokenEnv = import.meta.env.PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN?.trim();
+
+  if (!domainEnv || !tokenEnv) {
+    console.error(
+      "[shopify] Missing environment variables: PUBLIC_SHOPIFY_STORE_DOMAIN and/or PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN.",
+    );
     cached = null;
     return null;
   }
-  const storeDomain = import.meta.env.PUBLIC_SHOPIFY_STORE_DOMAIN!.replace(/^https?:\/\//, "").trim();
-  const apiVersion = import.meta.env.PUBLIC_SHOPIFY_API_VERSION?.trim() || "2025-01";
-  const publicAccessToken = import.meta.env.PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN!.trim();
+
+  const storeDomain = normalizeStoreDomain(domainEnv);
+  if (!storeDomain) {
+    cached = null;
+    return null;
+  }
+
+  const apiVersion = import.meta.env.PUBLIC_SHOPIFY_API_VERSION?.trim() || "2026-01";
+  const publicAccessToken = tokenEnv;
 
   cached = createStorefrontApiClient({
     storeDomain,

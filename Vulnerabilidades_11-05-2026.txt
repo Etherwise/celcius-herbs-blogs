@@ -1,0 +1,266 @@
+RELATÓRIO DE VULNERABILIDADES — CELSIUS HERBS (HEADLESS ASTRO STOREFRONT)
+Data: 11/05/2026 — 17:12
+Analisado por: Claude Code (claude-sonnet-4-6)
+======================================================================
+
+LEGENDA DE SEVERIDADE
+  [CRÍTICO]  Risco imediato de comprometimento de credenciais ou dados
+  [ALTO]     Vaza dados sensíveis ou permite ação não autorizada
+  [MÉDIO]    Vetor de ataque que exige condição adicional para exploração
+  [BAIXO]    Má prática de segurança, risco baixo no contexto atual
+  [INFO]     Comportamento esperado, mas importante documentar
+
+
+======================================================================
+[CRÍTICO] #1 — CREDENCIAIS REAIS NO .env.example
+======================================================================
+
+Arquivo:  .env.example (linhas 3-4)
+
+Problema:
+  O arquivo .env.example contém o token real da Shopify Storefront API
+  e o domínio da loja:
+
+      PUBLIC_SHOPIFY_STORE_DOMAIN=celsiusherbs.myshopify.com
+      PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN=dfbffd04277cb5519df13eb7657dd5f5
+
+  O .gitignore inclui explicitamente esse arquivo:
+      !.env.example   ← está sendo versionado no git
+
+  Qualquer pessoa com acesso ao repositório (incluindo repositórios
+  públicos ou ex-colaboradores) pode usar esse token para:
+    - Fazer queries na Storefront API da loja (produtos, preços, coleções)
+    - Criar carrinhos e gerar checkoutUrls
+    - Enumerar variantes, handles e metadados internos do catálogo
+
+Correção:
+  1. Rotacionar imediatamente o token no Shopify Admin:
+     Admin → Apps → Develop apps → [app] → Storefront API → Rotate token
+  2. Substituir os valores no .env.example por placeholders:
+     PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+     PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN=your_storefront_api_token_here
+  3. Garantir que o .env real NUNCA seja commitado (já está no .gitignore,
+     mas revisar o histórico do git para confirmar).
+
+
+======================================================================
+[ALTO] #2 — console.log COM DADOS DO CARRINHO EM PRODUÇÃO
+======================================================================
+
+Arquivo:  src/lib/shopify/storefront.ts (linha 473)
+
+Problema:
+  A função `createCart` possui um console.log ativo que serializa
+  e imprime toda a resposta da API do Shopify no console do browser:
+
+      console.log("Dados do carrinho" + JSON.stringify(data))
+
+  Em produção isso expõe no DevTools de qualquer usuário:
+    - ID do carrinho Shopify (gid://shopify/Cart/...)
+    - checkoutUrl completa (incluindo token de sessão)
+    - IDs de variantes
+    - Preços e quantidades
+
+  Um atacante com acesso físico ao dispositivo ou via ferramenta
+  de monitoramento pode capturar o checkoutUrl e redirecionar
+  o pagamento ou inspecionar o estado do carrinho.
+
+Correção:
+  Remover a linha completamente (já existe um similar comentado na
+  linha 371 — esse também deve permanecer comentado ou ser removido):
+
+      // linha 473: remover ou substituir por log condicional de dev
+      if (import.meta.env.DEV) {
+        console.log("Dados do carrinho", data);
+      }
+
+
+======================================================================
+[MÉDIO] #3 — dangerouslySetInnerHTML COM RISCO POTENCIAL DE XSS
+======================================================================
+
+Arquivo:  src/views/pdp/VglowYeastSerum.tsx (linhas 678 e 790)
+
+Problema:
+  Dois pontos usam dangerouslySetInnerHTML para renderizar strings:
+
+      <span dangerouslySetInnerHTML={{ __html: t }} />        (linha 678)
+      <span dangerouslySetInnerHTML={{ __html: s.label }} />  (linha 790)
+
+  Atualmente as strings são constantes hardcoded no próprio arquivo,
+  então o risco de XSS é BAIXO no estado atual.
+
+  Porém, se no futuro esses dados passarem a vir de:
+    - Shopify Metafields
+    - CMS externo
+    - Input do usuário
+  ...o vetor de XSS estará aberto sem nenhuma barreira.
+
+Correção:
+  Se o HTML é apenas para negrito/itálico, substituir por JSX simples.
+  Se HTML for realmente necessário (ex: descriptionHtml do Shopify),
+  sanitizar com DOMPurify antes de renderizar:
+
+      import DOMPurify from "dompurify";
+      <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t) }} />
+
+
+======================================================================
+[MÉDIO] #4 — CART ID NO localStorage SEM VALIDAÇÃO DE FORMATO
+======================================================================
+
+Arquivo:  src/lib/shopify/cart-actions.ts (linhas 105 e 149)
+
+Problema:
+  O ID do carrinho é lido do localStorage sem nenhuma validação:
+
+      const cartId = localStorage.getItem("shopify_cart_id");
+
+  Formato esperado pelo Shopify: "gid://shopify/Cart/[hash]"
+
+  Se um script malicioso (via XSS em outra extensão do browser ou
+  injeção de terceiro) manipular esse valor no localStorage, a
+  próxima chamada enviará um cartId arbitrário para a API Shopify,
+  podendo causar:
+    - Falha silenciosa (cart não encontrado, cria um novo)
+    - Cart fixation: forçar o usuário a usar um carrinho controlado
+      pelo atacante que já contém itens pré-selecionados
+
+Correção:
+  Validar o formato antes de usar:
+
+      const raw = localStorage.getItem("shopify_cart_id");
+      const cartId = raw?.startsWith("gid://shopify/Cart/") ? raw : null;
+
+
+======================================================================
+[MÉDIO] #5 — SUPABASE INICIALIZADO SEM VARIÁVEIS DE AMBIENTE
+======================================================================
+
+Arquivo:  src/integrations/supabase/client.ts (linhas 5-6)
+
+Problema:
+  O cliente Supabase é criado usando variáveis que não existem no .env:
+
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;           // undefined
+      const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY; // undefined
+
+      export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ...)
+
+  `createClient` recebe `undefined` como URL e chave. O cliente é
+  exportado e pode ser importado em qualquer componente. Em runtime,
+  qualquer chamada ao Supabase falhará silenciosamente ou com erro
+  genérico, sem alertar o desenvolvedor sobre a configuração ausente.
+
+  Adicionalmente, se as credenciais reais do Supabase forem adicionadas
+  ao .env no futuro sem proteção de Row Level Security (RLS), toda a
+  base de dados ficará acessível pelo browser.
+
+Correção:
+  1. Adicionar as variáveis ao .env (com valores reais ou placeholder):
+       VITE_SUPABASE_URL=https://your-project.supabase.co
+       VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+  2. Adicionar guard no client.ts:
+       if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+         throw new Error("[supabase] Missing environment variables.");
+       }
+  3. Garantir que RLS esteja ativo em todas as tabelas do Supabase.
+
+
+======================================================================
+[BAIXO] #6 — host: true NO SERVIDOR DE DESENVOLVIMENTO
+======================================================================
+
+Arquivo:  astro.config.mjs (linha 44)
+
+Problema:
+  O servidor de desenvolvimento está configurado para aceitar conexões
+  em todas as interfaces de rede:
+
+      server: {
+        host: true,   ← expõe o servidor na rede local (0.0.0.0)
+        port: 8080,
+      }
+
+  Em uma rede compartilhada (escritório, Wi-Fi público), outros
+  dispositivos na mesma rede podem acessar o ambiente de desenvolvimento,
+  incluindo rotas, APIs internas e dados de debug.
+
+Correção:
+  Limitar ao loopback se acesso externo não for necessário:
+      host: "127.0.0.1"
+  Ou manter `true` apenas quando explicitamente necessário (ex: testes
+  em dispositivo móvel real na mesma rede).
+
+
+======================================================================
+[BAIXO] #7 — AUSÊNCIA DE HEADERS DE SEGURANÇA HTTP
+======================================================================
+
+Arquivo:  astro.config.mjs / nenhum middleware configurado
+
+Problema:
+  Não há configuração de headers de segurança HTTP para o deploy no
+  Cloudflare. Os seguintes headers estão ausentes:
+
+    - Content-Security-Policy (CSP): sem restrição de fontes de scripts
+    - X-Frame-Options: página pode ser embutida em iframes (clickjacking)
+    - X-Content-Type-Options: browser pode tentar inferir MIME types
+    - Referrer-Policy: URL completa pode vazar para terceiros
+    - Permissions-Policy: sem restrição de APIs do browser
+
+Correção:
+  Criar arquivo `public/_headers` (suportado pelo Cloudflare Pages):
+
+      /*
+        X-Frame-Options: DENY
+        X-Content-Type-Options: nosniff
+        Referrer-Policy: strict-origin-when-cross-origin
+        Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+  Para CSP, configurar após mapear todas as fontes externas utilizadas
+  (Shopify CDN, YouTube via LiteYouTube, fontes, etc.).
+
+
+======================================================================
+[INFO] #8 — TOKEN DA STOREFRONT API EXPOSTO NO BUNDLE DO CLIENTE
+======================================================================
+
+Arquivo:  src/lib/shopify/client.ts (linha 22-23)
+
+Observação:
+  O PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN está prefixado com PUBLIC_,
+  o que significa que o Astro/Vite o inclui no bundle JavaScript
+  enviado ao browser — isso é INTENCIONAL pela Shopify.
+
+  A Storefront API foi projetada para ser acessada pelo frontend.
+  O token é de leitura limitada e seu escopo é controlado no
+  Shopify Admin (Admin → Apps → Develop apps → Storefront API scopes).
+
+  Recomendação:
+  Revisar no Shopify Admin quais escopos estão ativos para esse token
+  e garantir que apenas os necessários estejam habilitados:
+    - Leitura de produtos: necessário
+    - Leitura de pedidos do cliente: verificar se realmente necessário
+    - Leitura de dados de clientes: verificar se realmente necessário
+
+
+======================================================================
+RESUMO EXECUTIVO
+======================================================================
+
+  Severidade   Qtd   Itens
+  ---------    ---   -----
+  CRÍTICO       1    #1 - Credenciais reais no .env.example
+  ALTO          1    #2 - console.log com dados do carrinho em produção
+  MÉDIO         3    #3 - dangerouslySetInnerHTML, #4 - cart localStorage, #5 - Supabase
+  BAIXO         2    #6 - host:true, #7 - Headers HTTP ausentes
+  INFO          1    #8 - Token público no bundle (comportamento esperado)
+
+AÇÃO IMEDIATA RECOMENDADA:
+  1. Rotacionar o token do Shopify e limpar o .env.example  (#1)
+  2. Remover o console.log do storefront.ts linha 473       (#2)
+
+======================================================================
+FIM DO RELATÓRIO
+======================================================================

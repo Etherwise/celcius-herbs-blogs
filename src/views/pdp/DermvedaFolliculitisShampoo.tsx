@@ -5,6 +5,12 @@ import {
   ChevronRight, ChevronLeft, Stethoscope, ShieldCheck, Microscope, Pill, Droplet,
   HeartHandshake, AlertCircle, Clock, Eye,
 } from "lucide-react";
+import { handleAddToCartRule } from "@/lib/shopify/cart-actions";
+import { getProduct, type ProductVariant } from "@/lib/shopify/storefront";
+import { useStore } from "@nanostores/react";
+import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import { $shopifyCart, hydrateShopifyCart } from "@/lib/shopify/cart-store";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
@@ -43,7 +49,7 @@ import follAfter from "@/assets/folliculitis-after-scalp.jpg";
  */
 
 type GalleryImage = { src: string; alt: string };
-
+const PDP_PRODUCT_NAME = "dermveda-folliculitis-shampoo";
 const PRODUCT_IMAGES: GalleryImage[] = [
   { src: spsHero, alt: "Dermveda Folliculitis Shampoo bottle on a soft peach background" },
   { src: spsDetail, alt: "Sulfur 8X HPUS and tea tree clinical label detail" },
@@ -234,10 +240,26 @@ const DermvedaFolliculitisShampoo = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [pack, setPack] = useState<"single" | "bundle">("bundle");
   const [qty, setQty] = useState(1);
+  const [, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
+  const [isAdding, setIsAdding] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
-  const singlePrice = 16.99;
-  const bundleOriginal = +(singlePrice * 2).toFixed(2);
-  const bundlePrice = +(bundleOriginal * 0.8).toFixed(2);
+  useEffect(() => {
+    getProduct(PDP_PRODUCT_NAME).then((p) => { if (p) setVariants(p.variants); });
+  }, []);
+
+  const fullVariant = variants[0];
+  const bundleVariant = variants.find((v) => {
+    const packOpt = v.selectedOptions.find((o) => o.name.toLowerCase() === "pack" || o.name.toLowerCase() === "size");
+    if (!packOpt) return false;
+    const val = packOpt.value.toLowerCase();
+    return val.startsWith("2") || val.includes("bundle") || val.includes("2-pack") || val.includes("twin");
+  });
+  const isBundleAvailable = !!bundleVariant?.availableForSale;
+  const singlePrice = fullVariant ? parseFloat(fullVariant.price.amount) : 16.99;
+  const bundlePrice = bundleVariant ? parseFloat(bundleVariant.price.amount) : +(singlePrice * 2 * 0.8).toFixed(2);
+  const bundleOriginal = bundleVariant?.compareAtPrice ? parseFloat(bundleVariant.compareAtPrice.amount) : +(singlePrice * 2).toFixed(2);
   const finalPrice = pack === "bundle" ? bundlePrice : singlePrice;
 
   const [showStickyBar, setShowStickyBar] = useState(false);
@@ -248,8 +270,33 @@ const DermvedaFolliculitisShampoo = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    void hydrateShopifyCart();
+  }, []);
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await handleAddToCartRule({
+        productName: PDP_PRODUCT_NAME,
+        size: pack === "bundle" ? "bundle" : "full",
+        purchase: "once",
+        qty,
+        cart,
+      });
+      setCartOpen(true);
+    } catch (err) {
+      console.error("Cart error:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsAdding(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <CartDrawer />
       {/* Announcement */}
       <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
         Dermatologist-formulated · Fragrance-free · Free 3-day US shipping
@@ -270,9 +317,13 @@ const DermvedaFolliculitisShampoo = () => {
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
             <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
             <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart">
+            <button className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">0</span>
+              {(cart?.totalQuantity ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
+                  {cart!.totalQuantity}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -318,7 +369,7 @@ const DermvedaFolliculitisShampoo = () => {
               loading="eager"
               decoding="async"
             />
-            <button
+           <button
               onClick={() => setActiveImage((activeImage - 1 + PRODUCT_IMAGES.length) % PRODUCT_IMAGES.length)}
               className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-background/80 backdrop-blur hover:bg-background flex items-center justify-center transition"
               aria-label="Previous image"
@@ -393,8 +444,9 @@ const DermvedaFolliculitisShampoo = () => {
                 <span className="text-sm font-medium whitespace-nowrap">${singlePrice.toFixed(2)}</span>
               </button>
               <button
-                onClick={() => setPack("bundle")}
-                className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50")}
+                onClick={() => isBundleAvailable && setPack("bundle")}
+                disabled={!isBundleAvailable}
+                className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50", !isBundleAvailable && "opacity-50 cursor-not-allowed")}
               >
                 <div className="flex items-center gap-3">
                   <span className={cn("h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0", pack === "bundle" ? "border-foreground" : "border-muted-foreground")}>
@@ -424,8 +476,12 @@ const DermvedaFolliculitisShampoo = () => {
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium">
-              Add to Bag · ${(finalPrice * qty).toFixed(2)}
+             <Button
+              className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+              onClick={handleAddToCart}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
             </Button>
           </div>
 
@@ -814,8 +870,12 @@ const DermvedaFolliculitisShampoo = () => {
                     <p className="text-xs text-muted-foreground leading-relaxed mb-4 min-h-[3.5rem]">{it.sub}</p>
                     <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-border">
                       <div className="text-sm font-medium">${it.price.toFixed(2)}</div>
-                      <Button variant="outline" size="sm" className="rounded-full text-[10px] tracking-[0.18em] uppercase px-4 h-8">
-                        Add to bag
+                      <Button
+                        className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+                        onClick={handleAddToCart}
+                        disabled={isAdding}
+                        >
+                        {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
                       </Button>
                     </div>
                   </div>

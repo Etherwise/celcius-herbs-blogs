@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
 import { LiteYouTube } from "@/components/LiteYouTube";
+import { useStore } from "@nanostores/react";
+import { handleAddToCartRule } from "@/lib/shopify/cart-actions";
+import { getProduct, type ProductVariant } from "@/lib/shopify/storefront";
+import { $shopifyCart, hydrateShopifyCart } from "@/lib/shopify/cart-store";
+import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import badgeCrueltyFree from "@/assets/badge-cruelty-free.png";
 import badgeUsdaOrganic from "@/assets/badge-usda-organic.png";
@@ -40,6 +46,9 @@ import spsSerum from "@/assets/sps-serum.png";
  */
 
 type GalleryImage = { src: string; alt: string };
+
+/** Shopify product handle — see Admin → Products → URL & SEO. */
+const PDP_PRODUCT_NAME = "scalp-psoriasis-shampoo";
 
 const PRODUCT_IMAGES: GalleryImage[] = [
   { src: spsHero, alt: "Dermveda Scalp Psoriasis Shampoo bottle, front" },
@@ -209,8 +218,25 @@ const ScalpPsoriasisShampoo = () => {
   const [cadence, setCadence] = useState<"4" | "6" | "8">("6");
   
   const [qty, setQty] = useState(1);
+  const [, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
+  const [isAdding, setIsAdding] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
-  const basePrice = size === "single" ? 16.99 : +(16.99 * 2 * 0.85).toFixed(2);
+  useEffect(() => {
+    getProduct(PDP_PRODUCT_NAME).then((p) => { if (p) setVariants(p.variants); });
+  }, []);
+
+  const fullVariant = variants[0];
+  const bundleVariant = variants.find((v) => {
+    const packOpt = v.selectedOptions.find((o) => o.name.toLowerCase() === "pack" || o.name.toLowerCase() === "size");
+    if (!packOpt) return false;
+    const val = packOpt.value.toLowerCase();
+    return val.startsWith("2") || val.includes("bundle") || val.includes("2-pack") || val.includes("twin");
+  });
+  const isBundleAvailable = !!bundleVariant?.availableForSale;
+  const activeVariant = size === "single" ? fullVariant : bundleVariant;
+  const basePrice = activeVariant ? parseFloat(activeVariant.price.amount) : (size === "single" ? 16.99 : +(16.99 * 2 * 0.85).toFixed(2));
   const finalPrice = purchase === "sub" ? +(basePrice * 0.9).toFixed(2) : basePrice;
 
   // Mobile sticky purchase bar — reveal after the user scrolls past the hero fold.
@@ -222,8 +248,34 @@ const ScalpPsoriasisShampoo = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    void hydrateShopifyCart();
+  }, []);
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await handleAddToCartRule({
+        productName: PDP_PRODUCT_NAME,
+        size: size === "twin" ? "bundle" : "full",
+        purchase,
+        qty,
+        cart,
+      });
+      setCartOpen(true);
+    } catch (err) {
+      console.error("Cart error:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <CartDrawer />
       {/* Announcement */}
       <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
         Dermatologist-formulated · Free 3-day shipping in the USA
@@ -244,9 +296,13 @@ const ScalpPsoriasisShampoo = () => {
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
             <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
             <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart">
+            <button type="button" className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">0</span>
+              {(cart?.totalQuantity ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
+                  {cart!.totalQuantity}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -266,7 +322,7 @@ const ScalpPsoriasisShampoo = () => {
       {/* Hero PDP */}
       <section className="max-w-[1320px] mx-auto px-4 sm:px-5 lg:px-10 py-6 lg:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* Gallery */}
-        <div className="lg:col-span-7 flex flex-col-reverse md:flex-row gap-3 md:gap-4 min-w-0">
+        <div className="lg:col-span-7 flex flex-col-reverse md:flex-row md:items-start gap-3 md:gap-4 min-w-0">
           <div className="flex md:flex-col gap-2.5 md:w-[88px] shrink-0 overflow-x-auto md:overflow-visible scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
             {PRODUCT_IMAGES.map((img, i) => (
               <button
@@ -279,7 +335,7 @@ const ScalpPsoriasisShampoo = () => {
               </button>
             ))}
           </div>
-          <div className="relative flex-1 bg-peach rounded-xl overflow-hidden aspect-[4/5] min-w-0">
+          <div className="relative flex-1 w-full min-w-0 bg-peach rounded-xl overflow-hidden aspect-[4/5]">
             <span className="absolute top-4 left-4 z-10 text-[10px] tracking-[0.25em] uppercase bg-background/95 backdrop-blur text-foreground px-3 py-1.5 rounded-full font-medium shadow-sm flex items-center gap-1.5">
               <Stethoscope className="w-3 h-3 text-accent" strokeWidth={2} /> Dermatologist tested
             </span>
@@ -289,7 +345,7 @@ const ScalpPsoriasisShampoo = () => {
             <img
               src={PRODUCT_IMAGES[activeImage].src}
               alt={PRODUCT_IMAGES[activeImage].alt}
-              className="w-full h-full object-contain p-6 sm:p-10"
+              className="absolute inset-0 size-full object-contain p-6 sm:p-10"
               loading="eager"
               decoding="async"
             />
@@ -358,13 +414,26 @@ const ScalpPsoriasisShampoo = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { k: "single" as const, label: "Single Bottle", sub: "236ml", price: "$16.99" },
-                { k: "twin" as const, label: "Treatment Pack", sub: "Save 15%", price: `$${(16.99 * 2 * 0.85).toFixed(2)}` },
+                {
+                  k: "single" as const,
+                  label: "Single Bottle",
+                  sub: "236ml",
+                  price: fullVariant ? `$${parseFloat(fullVariant.price.amount).toFixed(2)}` : "$16.99",
+                  available: fullVariant?.availableForSale ?? true,
+                },
+                {
+                  k: "twin" as const,
+                  label: "Treatment Pack",
+                  sub: isBundleAvailable ? "Save 15%" : "Out of stock",
+                  price: bundleVariant ? `$${parseFloat(bundleVariant.price.amount).toFixed(2)}` : "—",
+                  available: isBundleAvailable,
+                },
               ].map((s) => (
                 <button
                   key={s.k}
-                  onClick={() => setSize(s.k)}
-                  className={cn("px-3 py-3 rounded-md border text-sm transition text-left", size === s.k ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50")}
+                  onClick={() => s.available && setSize(s.k)}
+                  disabled={!s.available}
+                  className={cn("px-3 py-3 rounded-md border text-sm transition text-left", size === s.k ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50", !s.available && "opacity-50 cursor-not-allowed")}
                 >
                   <div className="font-medium text-[13px]">{s.label} · {s.sub}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{s.price}</div>
@@ -477,8 +546,13 @@ const ScalpPsoriasisShampoo = () => {
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium">
-              Add to Bag · ${(finalPrice * qty).toFixed(2)}
+            <Button
+              type="button"
+              className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+              onClick={handleAddToCart}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
             </Button>
           </div>
 
@@ -1198,10 +1272,13 @@ const ScalpPsoriasisShampoo = () => {
             </div>
           </div>
           <Button
+            type="button"
             size="sm"
             className="rounded-full px-4 h-10 text-[11px] tracking-[0.16em] uppercase bg-ink-deep text-primary-foreground hover:bg-ink-deep/90 shrink-0"
+            onClick={handleAddToCart}
+            disabled={isAdding}
           >
-            Shop set
+            {isAdding ? "Adding…" : "Shop set"}
           </Button>
         </div>
       </div>

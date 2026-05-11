@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useStore } from "@nanostores/react";
 import {
   Heart, Search, ShoppingBag, User, Plus, Minus, Check, Star,
   Leaf, FlaskConical, Sparkles, Sun, Moon, Truck, RotateCcw, Award,
@@ -8,7 +9,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
-import { LiteYouTube } from "@/components/LiteYouTube";
+import { handleAddToCartRule } from "@/lib/shopify/cart-actions";
+import { getProduct, type ProductVariant } from "@/lib/shopify/storefront";
+import { $shopifyCart, hydrateShopifyCart, syncShopifyCart } from "@/lib/shopify/cart-store";
+import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import badgeCrueltyFree from "@/assets/petglow-badge-cruelty-free.png";
 import badgeNatural from "@/assets/petglow-badge-premium.png";
@@ -49,7 +54,7 @@ import catStep4 from "@/assets/cat-step-4-repeat.jpg";
  */
 
 type GalleryImage = { src: string; alt: string; video?: string; poster?: string };
-
+const PDP_PRODUCT_NAME = "cat-dandruff-miliary-dermatitis"
 const PRODUCT_IMAGES: GalleryImage[] = [
   { src: catHero, alt: "PetGlow Kitty Skin Lotion bottle beside a calm ginger tabby cat" },
   {
@@ -181,10 +186,12 @@ const REVIEW_STRUCTURE = [
   { rating: 0, title: "", body: "No verified reviews yet — be the first to share your cat's transformation.", name: "", verified: false, skin: "" },
 ];
 
+
 const IngredientSlider = () => {
   const [api, setApi] = useState<CarouselApi | null>(null);
   const [current, setCurrent] = useState(0);
-
+  const [cartOpen, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
   useEffect(() => {
     if (!api) return;
     setCurrent(api.selectedScrollSnap());
@@ -249,13 +256,30 @@ const CatDandruffLotion = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [pack, setPack] = useState<"single" | "bundle">("bundle");
   const [qty, setQty] = useState(1);
+  const [purchase, setPurchase] = useState<"once" | "sub">("sub");
+  const cartSize = pack === "bundle" ? "bundle" : "full";
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
-  const singlePrice = 14.99;
-  const bundleOriginal = +(singlePrice * 2).toFixed(2);
-  const bundlePrice = +(bundleOriginal * 0.8).toFixed(2);
+  useEffect(() => {
+    getProduct(PDP_PRODUCT_NAME).then((p) => { if (p) setVariants(p.variants); });
+  }, []);
+
+  const fullVariant = variants[0];
+  const bundleVariant = variants.find((v) => {
+    const packOpt = v.selectedOptions.find((o) => o.name.toLowerCase() === "pack" || o.name.toLowerCase() === "size");
+    if (!packOpt) return false;
+    const val = packOpt.value.toLowerCase();
+    return val.startsWith("2") || val.includes("bundle") || val.includes("2-pack") || val.includes("twin");
+  });
+  const isBundleAvailable = !!bundleVariant?.availableForSale;
+  const singlePrice = fullVariant ? parseFloat(fullVariant.price.amount) : 14.99;
+  const bundlePrice = bundleVariant ? parseFloat(bundleVariant.price.amount) : +(singlePrice * 2 * 0.8).toFixed(2);
+  const bundleOriginal = bundleVariant?.compareAtPrice ? parseFloat(bundleVariant.compareAtPrice.amount) : +(singlePrice * 2).toFixed(2);
   const finalPrice = pack === "bundle" ? bundlePrice : singlePrice;
-
+  const [cartOpen, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   useEffect(() => {
     const onScroll = () => setShowStickyBar(window.scrollY > 600);
     onScroll();
@@ -263,8 +287,36 @@ const CatDandruffLotion = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+   // Rehydrate full cart from persisted cart ID.
+   useEffect(() => {
+    void hydrateShopifyCart();
+  }, []);
+
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await handleAddToCartRule({
+        productName: PDP_PRODUCT_NAME,
+        size: cartSize,
+        purchase,
+        qty,
+        cart,
+      });
+      setCartOpen(true);
+    } catch (err) {
+      console.error("Cart error:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsAdding(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <CartDrawer />
+
       {/* Announcement */}
       <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
         Vet-formulated · Lick-safe · Free 3-day shipping in the USA
@@ -285,9 +337,13 @@ const CatDandruffLotion = () => {
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
             <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
             <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart">
+            <button className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">0</span>
+              {(cart?.totalQuantity ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
+                  {cart!.totalQuantity}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -431,8 +487,9 @@ const CatDandruffLotion = () => {
                 <span className="text-sm font-medium whitespace-nowrap">${singlePrice.toFixed(2)}</span>
               </button>
               <button
-                onClick={() => setPack("bundle")}
-                className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50")}
+                onClick={() => isBundleAvailable && setPack("bundle")}
+                disabled={!isBundleAvailable}
+                className={cn("w-full px-4 py-3.5 rounded-md border-2 transition flex items-center justify-between gap-3 text-left", pack === "bundle" ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50", !isBundleAvailable && "opacity-50 cursor-not-allowed")}
               >
                 <div className="flex items-center gap-3">
                   <span className={cn("h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0", pack === "bundle" ? "border-foreground" : "border-muted-foreground")}>
@@ -462,8 +519,12 @@ const CatDandruffLotion = () => {
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium">
-              Add to Bag · ${(finalPrice * qty).toFixed(2)}
+            <Button
+              className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+              onClick={handleAddToCart}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
             </Button>
           </div>
 
@@ -926,11 +987,11 @@ const CatDandruffLotion = () => {
                     <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-border">
                       <div className="text-sm font-medium">${it.price.toFixed(2)}</div>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full text-[10px] tracking-[0.18em] uppercase px-4 h-8"
-                      >
-                        Add to bag
+                          className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+                          onClick={handleAddToCart}
+                          disabled={isAdding}
+                          >
+                          {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
                       </Button>
                     </div>
                   </div>
@@ -948,9 +1009,13 @@ const CatDandruffLotion = () => {
                     <Check className="h-3.5 w-3.5 text-accent" strokeWidth={2.5} /> Free shipping · 60-day money-back guarantee
                   </div>
                 </div>
-                <Button size="lg" className="rounded-full px-8 text-xs tracking-[0.2em] uppercase w-full md:w-auto">
-                  Add ritual bundle — ${bundlePrice.toFixed(2)}
-                </Button>
+                <Button
+                          className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+                          onClick={handleAddToCart}
+                          disabled={isAdding}
+                          >
+                          {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
+                      </Button>
               </div>
             </div>
           );

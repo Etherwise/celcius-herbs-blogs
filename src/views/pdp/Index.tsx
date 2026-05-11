@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
+import { useStore } from "@nanostores/react";
 import {
   Heart, Search, ShoppingBag, User, Plus, Minus, Check, Star,
   Leaf, ShieldCheck, FlaskConical, Sparkles, Sun, Moon, Truck, RotateCcw, Award,
   ChevronRight, ChevronLeft, Zap, Rabbit, Sprout, Flag,
+  StethoscopeIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
 import { LiteYouTube } from "@/components/LiteYouTube";
 import { ZoomIn, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { $shopifyCart, hydrateShopifyCart } from "@/lib/shopify/cart-store";
+import { handleAddToCartRule } from "@/lib/shopify/cart-actions";
+import { getProduct, type ProductVariant } from "@/lib/shopify/storefront";
+import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import { toast } from "sonner";
 import serumHero from "@/assets/serum-hero.jpg";
 import serumSwatch from "@/assets/serum-swatch.jpg";
 import serumSkin from "@/assets/serum-skin.jpg";
@@ -41,6 +48,10 @@ import badgeCrueltyFree from "@/assets/badge-cruelty-free.png";
 import badgeUsdaOrganic from "@/assets/badge-usda-organic.png";
 import badgeVegan from "@/assets/badge-vegan.png";
 import badgeMadeInUsa from "@/assets/badge-made-in-usa.png";
+import { Line } from "recharts";
+
+
+const PDP_PRODUCT_NAME = "organic-bakuchiol-booster-serum";
 
 type GalleryItem = {
   type: "image" | "video";
@@ -48,6 +59,7 @@ type GalleryItem = {
   alt: string;
   poster?: string;
 };
+
 
 const PRODUCT_IMAGES: GalleryItem[] = [
   { type: "video", src: serumProductVideo, alt: "Bakuchiol Booster Serum in motion", poster: serumHero },
@@ -182,6 +194,8 @@ const FAQS: Faq[] = [
   { q: "How do I layer it?", a: "Cleanse, mist or tone, then press 4–5 drops into damp skin morning and night. Follow with moisturizer. SPF in the morning is always recommended." },
   { q: "What's the full ingredient list?", a: "Organic Bakuchiol extract 4%, Turmeric extract, Quinoa extract, Niacinamide, Glycerin, Xanthan Gum, Aqua. That's it — no fillers, no fragrance, no parabens." },
 ];
+
+
 
 /**
  * Reusable Instagram-style caption overlay for the lifestyle application image.
@@ -689,6 +703,9 @@ const UgcCarousel = () => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
 const Index = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [size, setSize] = useState<"full" | "bundle">("full");
@@ -703,6 +720,42 @@ const Index = () => {
   // until then we keep a shimmer overlay over the poster so the swap
   // feels seamless instead of janky.
   const [videoReady, setVideoReady] = useState(false);
+  const [cartOpen, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const cart = useStore($shopifyCart);
+  const [isAdding, setIsAdding] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+
+  // Rehydrate full cart from persisted cart ID.
+  useEffect(() => {
+    void hydrateShopifyCart();
+  }, []);
+
+  useEffect(() => {
+    getProduct(PDP_PRODUCT_NAME).then((p) => {
+      if (p) setVariants(p.variants);
+    });
+  }, []);
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await handleAddToCartRule({
+        productName: PDP_PRODUCT_NAME,
+        size,
+        purchase,
+        qty,
+        cart,
+      });
+      setCartOpen(true);
+    } catch (err) {
+      console.error("Cart error:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   // Mobile / low-data clients get a static poster instead of an autoplaying
   // video, and the smaller WebP variants for hero imagery.
@@ -752,6 +805,8 @@ const Index = () => {
   // declines the declarative `autoplay` attribute even when muted, so we
   // call play() once the element mounts and whenever the active slide
   // returns to the video.
+
+  
   useEffect(() => {
     setVideoReady(false);
     if (!heroInView) return;
@@ -777,11 +832,24 @@ const Index = () => {
     };
   }, [activeImage, useStaticFallback, heroInView]);
 
-  const basePrice = size === "full" ? 19.89 : +(19.89 * 2 * 0.7).toFixed(2);
+  const fullVariant = variants[0];
+  const bundleVariant = variants.find((v) => {
+    const packOpt = v.selectedOptions.find((o) =>
+      o.name.toLowerCase() === "pack" || o.name.toLowerCase() === "size"
+    );
+    if (!packOpt) return false;
+    const val = packOpt.value.toLowerCase();
+    return val.startsWith("2") || val.includes("bundle") || val.includes("2-pack") || val.includes("twin");
+  });
+  const isBundleAvailable = !!bundleVariant?.availableForSale;
+  const activeVariant = size === "full" ? fullVariant : bundleVariant;
+  const basePrice = activeVariant ? parseFloat(activeVariant.price.amount) : (size === "full" ? 19.89 : 27.82);
   const finalPrice = purchase === "sub" ? +(basePrice * 0.9).toFixed(2) : basePrice;
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <CartDrawer />
+
       {/* Announcement */}
       <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
         Free shipping on orders over $24.99 · Free skincare quiz with every order
@@ -805,9 +873,13 @@ const Index = () => {
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
             <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
             <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart">
+            <button className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">2</span>
+              {(cart?.totalQuantity ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
+                  {cart!.totalQuantity}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -872,7 +944,7 @@ const Index = () => {
                   className="w-full h-full object-cover"
                   loading="eager"
                   decoding="async"
-                  fetchPriority="high"
+                  fetchpriority="high"
                 />
               ) : (
                 <>
@@ -987,15 +1059,29 @@ const Index = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { k: "full" as const, label: "Full Size", sub: "60ml", price: "$19.89" },
-                { k: "bundle" as const, label: "Bundle of 2", sub: "Save 30%", price: `$${(19.89 * 2 * 0.7).toFixed(2)}` },
+                {
+                  k: "full" as const,
+                  label: "Full Size",
+                  sub: "60ml",
+                  price: fullVariant ? `$${parseFloat(fullVariant.price.amount).toFixed(2)}` : "—",
+                  available: fullVariant?.availableForSale ?? true,
+                },
+                {
+                  k: "bundle" as const,
+                  label: "Bundle of 2",
+                  sub: isBundleAvailable ? "Save more" : "Out of stock",
+                  price: bundleVariant ? `$${parseFloat(bundleVariant.price.amount).toFixed(2)}` : "—",
+                  available: isBundleAvailable,
+                },
               ].map((s) => (
                 <button
                   key={s.k}
-                  onClick={() => setSize(s.k)}
+                  onClick={() => s.available && setSize(s.k)}
+                  disabled={!s.available}
                   className={cn(
                     "px-3 py-3 rounded-md border text-sm transition text-left",
                     size === s.k ? "border-foreground bg-secondary/40" : "border-border hover:border-muted-foreground/50",
+                    !s.available && "opacity-50 cursor-not-allowed",
                   )}
                 >
                   <div className="font-medium text-[13px]">{s.label} · {s.sub}</div>
@@ -1059,8 +1145,12 @@ const Index = () => {
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium">
-              Add to Bag · ${(finalPrice * qty).toFixed(2)}
+            <Button
+              className="flex-1 h-12 rounded-md tracking-[0.12em] text-xs uppercase font-medium"
+              onClick={handleAddToCart}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding…" : `Add to Bag · $${(finalPrice * qty).toFixed(2)}`}
             </Button>
           </div>
 
@@ -1178,6 +1268,8 @@ const Index = () => {
                 </button>
               </DialogTrigger>
               <DialogContent className="max-w-[96vw] sm:max-w-3xl p-0 overflow-hidden">
+                <DialogTitle className="sr-only">Product video — zoomed view</DialogTitle>
+                <DialogDescription className="sr-only">Full-screen playback of the Bakuchiol Booster Serum application video.</DialogDescription>
                 <div className="relative w-full max-h-[88vh] overflow-auto bg-ink-deep">
                   <video
                     poster={serumVideoPoster}
@@ -1261,6 +1353,8 @@ const Index = () => {
               </button>
             </DialogTrigger>
             <DialogContent className="max-w-[96vw] sm:max-w-4xl p-0 overflow-hidden">
+                <DialogTitle className="sr-only">Before and after — zoomed view</DialogTitle>
+                <DialogDescription className="sr-only">Zoomed before and after comparison showing skin improvement after 4 weeks of use.</DialogDescription>
               <div className="relative w-full max-h-[88vh] overflow-auto bg-background">
                 <img
                   src={serumBeforeAfter}
