@@ -1,114 +1,114 @@
-# Celsius Herbs — Guia de Deploy
+# Celsius Herbs — Deployment Guide
 
 > Astro 5 · Shopify Headless · Cloudflare Pages
 
 ---
 
-## Índice
+## Table of Contents
 
-1. [Pré-requisitos](#1-pré-requisitos)
-2. [Variáveis de Ambiente](#2-variáveis-de-ambiente)
-3. [Configuração do Build](#3-configuração-do-build)
-4. [Deploy via Cloudflare Dashboard (recomendado)](#4-deploy-via-cloudflare-dashboard-recomendado)
+1. [Prerequisites](#1-prerequisites)
+2. [Environment Variables](#2-environment-variables)
+3. [Build Configuration](#3-build-configuration)
+4. [Deploy via Cloudflare Dashboard (recommended)](#4-deploy-via-cloudflare-dashboard-recommended)
 5. [Deploy via Wrangler CLI](#5-deploy-via-wrangler-cli)
-6. [Verificação pós-deploy](#6-verificação-pós-deploy)
-7. [Solução de Problemas Comuns](#7-solução-de-problemas-comuns)
+6. [Post-deploy Checklist](#6-post-deploy-checklist)
+7. [Common Troubleshooting](#7-common-troubleshooting)
 
 ---
 
-## 1. Pré-requisitos
+## 1. Prerequisites
 
-| Requisito | Versão mínima |
+| Requirement | Minimum version |
 |---|---|
 | Node.js | 18.x |
 | npm | 9.x |
 | Wrangler CLI | 3.x (`npm i -g wrangler`) |
-| Conta Cloudflare | com Pages habilitado |
-| App Shopify (Headless) | Storefront API ativada |
+| Cloudflare account | with Pages enabled |
+| Shopify app (Headless) | Storefront API enabled |
 
 ---
 
-## 2. Variáveis de Ambiente
+## 2. Environment Variables
 
-### 2.1 Variáveis obrigatórias
+### 2.1 Required variables
 
-| Variável | Tipo | Descrição |
+| Variable | Type | Description |
 |---|---|---|
-| `PUBLIC_SHOPIFY_STORE_DOMAIN` | Público | Domínio da loja, ex: `sua-loja.myshopify.com` |
-| `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` | **Secret** | Token da Storefront API do Shopify |
+| `PUBLIC_SHOPIFY_STORE_DOMAIN` | Public | Store domain, e.g. `your-store.myshopify.com` |
+| `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` | **Secret** | Shopify Storefront API token |
 
-### 2.2 Variáveis opcionais
+### 2.2 Optional variables
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `PUBLIC_SHOPIFY_API_VERSION` | `2026-01` | Versão da Storefront API |
-| `VITE_SUPABASE_URL` | — | URL do projeto Supabase (se usado) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | — | Chave pública do Supabase (se usado) |
+| `PUBLIC_SHOPIFY_API_VERSION` | `2026-01` | Storefront API version |
+| `VITE_SUPABASE_URL` | — | Supabase project URL (if used) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | — | Supabase public key (if used) |
 
-### 2.3 Arquivo `.env` local (desenvolvimento)
+### 2.3 Local `.env` file (development)
 
-Crie o arquivo `.env` na raiz do projeto com base no `.env.example`:
+Create the `.env` file at the project root based on `.env.example`:
 
 ```bash
 cp .env.example .env
 ```
 
-Preencha com os valores reais:
+Fill in the real values:
 
 ```env
-PUBLIC_SHOPIFY_STORE_DOMAIN=sua-loja.myshopify.com
-PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN=seu_token_aqui
+PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_token_here
 
-# Opcional
+# Optional
 # PUBLIC_SHOPIFY_API_VERSION=2026-01
-# VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-# VITE_SUPABASE_PUBLISHABLE_KEY=sua_chave_publica
+# VITE_SUPABASE_URL=https://your-project.supabase.co
+# VITE_SUPABASE_PUBLISHABLE_KEY=your_public_key
 ```
 
-> **Onde obter o token do Shopify:**
-> Shopify Admin → Apps → Develop apps → [Selecione ou crie o app] →
-> API credentials → Storefront API access token → copie o token gerado.
+> **Where to get the Shopify token:**
+> Shopify Admin → Apps → Develop apps → [Select or create the app] →
+> API credentials → Storefront API access token → copy the generated token.
 
-> ⚠️ **NUNCA commite o arquivo `.env` com valores reais.** Ele já está no `.gitignore`.
-> O `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` deve ser cadastrado como **Secret**
-> no painel da Cloudflare (veja seção 4.3).
+> ⚠️ **NEVER commit the `.env` file with real values.** It is already listed in `.gitignore`.
+> The `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` must be added as a **Secret**
+> in the Cloudflare dashboard (see section 4.3).
 
 ---
 
-## 3. Configuração do Build
+## 3. Build Configuration
 
-### 3.1 Comando de build
+### 3.1 Build command
 
 ```bash
 npm run build
 ```
 
-Internamente executa: `ASTRO_TELEMETRY_DISABLED=1 astro build`
+Internally runs: `ASTRO_TELEMETRY_DISABLED=1 astro build`
 
-### 3.2 Diretório de saída
+### 3.2 Output directory
 
 ```
 ./dist
 ```
 
-### 3.3 Modo de output (SSR)
+### 3.3 Output mode (SSR)
 
-O projeto usa `output: "server"` via adaptador `@astrojs/cloudflare`.
-Confirme que o `astro.config.mjs` contém:
+The project uses `output: "server"` via the `@astrojs/cloudflare` adapter.
+Confirm that `astro.config.mjs` contains:
 
 ```js
 import { defineConfig } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 
 export default defineConfig({
-  output: "server",        // ← obrigatório para SSR no Edge
+  output: "server",        // ← required for SSR on the Edge
   adapter: cloudflare(),
   integrations: [react()],
   // ...
 });
 ```
 
-### 3.4 `wrangler.toml` (referência)
+### 3.4 `wrangler.toml` (reference)
 
 ```toml
 name                    = "celsius-herbs"
@@ -117,93 +117,93 @@ compatibility_date      = "2024-09-23"
 compatibility_flags     = ["nodejs_compat"]
 
 [vars]
-PUBLIC_SHOPIFY_STORE_DOMAIN = "sua-loja.myshopify.com"
-# PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN → configurar como Secret no painel
+PUBLIC_SHOPIFY_STORE_DOMAIN = "your-store.myshopify.com"
+# PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN → set as a Secret in the dashboard
 ```
 
 ---
 
-## 4. Deploy via Cloudflare Dashboard (recomendado)
+## 4. Deploy via Cloudflare Dashboard (recommended)
 
-### Passo 1 — Conectar repositório
+### Step 1 — Connect repository
 
-1. Acesse [dash.cloudflare.com](https://dash.cloudflare.com)
-2. Menu lateral → **Workers & Pages** → **Create application**
-3. Aba **Pages** → **Connect to Git**
-4. Autorize o acesso ao GitHub/GitLab e selecione o repositório `celsius-herbs`
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com)
+2. Left sidebar → **Workers & Pages** → **Create application**
+3. **Pages** tab → **Connect to Git**
+4. Authorize access to GitHub/GitLab and select the `celsius-herbs` repository
 
-### Passo 2 — Configurar o build
+### Step 2 — Configure the build
 
-Na tela **Set up builds and deployments**, preencha:
+On the **Set up builds and deployments** screen, fill in:
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
 | **Framework preset** | `Astro` |
 | **Build command** | `npm run build` |
 | **Build output directory** | `dist` |
-| **Root directory** | `/` (raiz do repositório) |
-| **Node.js version** | `18` (ou superior) |
+| **Root directory** | `/` (repository root) |
+| **Node.js version** | `18` (or higher) |
 
-### Passo 3 — Configurar variáveis de ambiente
+### Step 3 — Configure environment variables
 
-Ainda na tela de configuração, expanda **Environment variables (advanced)**:
+Still on the configuration screen, expand **Environment variables (advanced)**:
 
-| Variável | Tipo | Valor |
+| Variable | Type | Value |
 |---|---|---|
-| `PUBLIC_SHOPIFY_STORE_DOMAIN` | Plain text | `sua-loja.myshopify.com` |
-| `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` | **Encrypt (Secret)** | `seu_token_aqui` |
+| `PUBLIC_SHOPIFY_STORE_DOMAIN` | Plain text | `your-store.myshopify.com` |
+| `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` | **Encrypt (Secret)** | `your_token_here` |
 | `NODE_VERSION` | Plain text | `18` |
 
-> Repita para os ambientes **Production** e **Preview** conforme necessário.
+> Repeat for both **Production** and **Preview** environments as needed.
 
-### Passo 4 — Salvar e fazer deploy
+### Step 4 — Save and deploy
 
-1. Clique em **Save and Deploy**
-2. Aguarde o build (aprox. 2–4 minutos)
-3. Acesse a URL gerada: `https://celsius-herbs.pages.dev`
+1. Click **Save and Deploy**
+2. Wait for the build to finish (approx. 2–4 minutes)
+3. Access the generated URL: `https://celsius-herbs.pages.dev`
 
-### Passo 5 — Domínio customizado (opcional)
+### Step 5 — Custom domain (optional)
 
 1. **Workers & Pages** → `celsius-herbs` → **Custom domains**
-2. Clique em **Set up a custom domain**
-3. Insira o domínio (ex: `celsiusherbs.com`) e siga as instruções de DNS
+2. Click **Set up a custom domain**
+3. Enter the domain (e.g. `celsiusherbs.com`) and follow the DNS instructions
 
 ---
 
 ## 5. Deploy via Wrangler CLI
 
-Use este método para deploys manuais ou pipelines de CI/CD sem integração Git.
+Use this method for manual deploys or CI/CD pipelines without Git integration.
 
-### Passo 1 — Autenticar na Cloudflare
+### Step 1 — Authenticate with Cloudflare
 
 ```bash
 wrangler login
 ```
 
-### Passo 2 — Instalar dependências e fazer o build
+### Step 2 — Install dependencies and build
 
 ```bash
 npm install
 npm run build
 ```
 
-### Passo 3 — Publicar no Cloudflare Pages
+### Step 3 — Publish to Cloudflare Pages
 
 ```bash
 wrangler pages deploy ./dist --project-name celsius-herbs
 ```
 
-### Passo 4 — Configurar Secrets via CLI
+### Step 4 — Configure Secrets via CLI
 
-As variáveis do tipo Secret não ficam no `wrangler.toml`. Configure-as via CLI:
+Secret variables must not be stored in `wrangler.toml`. Set them via CLI:
 
 ```bash
-# Para produção
+# For production
 wrangler pages secret put PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN \
   --project-name celsius-herbs
-# → o terminal pedirá o valor (não fica visível no histórico)
+# → the terminal will prompt for the value (not visible in shell history)
 
-# Para preview (branch de staging)
+# For preview (staging branch)
 wrangler pages secret put PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN \
   --project-name celsius-herbs \
   --env preview
@@ -211,69 +211,69 @@ wrangler pages secret put PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN \
 
 ---
 
-## 6. Verificação pós-deploy
+## 6. Post-deploy Checklist
 
-Após o deploy, valide os seguintes pontos:
+After deploying, validate the following:
 
-- [ ] Página inicial (`/`) carrega sem erros no console
-- [ ] Pelo menos um PDP (`/folliculitis-shampoo`) exibe produto e preço do Shopify
-- [ ] Botão **Add to Bag** adiciona item ao carrinho (verify no CartDrawer)
-- [ ] Botão **Checkout** redireciona para `checkout.shopify.com/...`
-- [ ] Página `/cart` lista os itens corretamente
-- [ ] Variantes de produto (Full Size / Bundle) mostram preços distintos
-- [ ] Bundle marcado como `Out of stock` quando `availableForSale: false`
+- [ ] Home page (`/`) loads without console errors
+- [ ] At least one PDP (`/folliculitis-shampoo`) displays the Shopify product and price
+- [ ] **Add to Bag** button adds an item to the cart (verify in CartDrawer)
+- [ ] **Checkout** button redirects to `checkout.shopify.com/...`
+- [ ] `/cart` page lists items correctly
+- [ ] Product variants (Full Size / Bundle) display distinct prices
+- [ ] Bundle shows `Out of stock` when `availableForSale: false`
 
 ---
 
-## 7. Solução de Problemas Comuns
+## 7. Common Troubleshooting
 
-### Build falha com erro de módulo Node.js
+### Build fails with Node.js module error
 
-**Sintoma:** `Error: Cannot find module 'crypto'` ou similar.
+**Symptom:** `Error: Cannot find module 'crypto'` or similar.
 
-**Solução:** Confirme que o `wrangler.toml` contém:
+**Fix:** Confirm that `wrangler.toml` contains:
 ```toml
 compatibility_flags = ["nodejs_compat"]
 ```
 
 ---
 
-### Carrinho não persiste entre páginas
+### Cart does not persist between pages
 
-**Sintoma:** Items somem ao navegar.
+**Symptom:** Items disappear when navigating.
 
-**Causa:** O `shopify_cart_id` no `localStorage` foi perdido ou está inválido.
+**Cause:** The `shopify_cart_id` in `localStorage` was lost or is invalid.
 
-**Solução:** Abra o DevTools → Application → Local Storage e verifique se a chave `shopify_cart_id` existe com um valor no formato `gid://shopify/Cart/...`.
-
----
-
-### Preços aparecem como `—` ou valor de fallback
-
-**Sintoma:** Botões de variante mostram `$0.00` ou o preço hardcoded em vez do preço real.
-
-**Causa:** A chamada `getProduct()` falhou — provavelmente token ou domínio incorretos.
-
-**Solução:**
-1. Confirme `PUBLIC_SHOPIFY_STORE_DOMAIN` e `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` no painel da Cloudflare
-2. Verifique se o app Shopify tem o escopo `unauthenticated_read_product_listings` ativo
+**Fix:** Open DevTools → Application → Local Storage and verify that the `shopify_cart_id` key exists with a value in the format `gid://shopify/Cart/...`.
 
 ---
 
-### Deploy rejeitado por tamanho de bundle
+### Prices display as `—` or fallback value
 
-**Sintoma:** `Error: Script size exceeds limit`.
+**Symptom:** Variant buttons show `$0.00` or a hardcoded price instead of the real price.
 
-**Solução:** Verifique se as imagens estão em `/public` (assets estáticos) e não importadas como módulos JS em componentes SSR.
+**Cause:** The `getProduct()` call failed — likely due to an incorrect token or domain.
 
----
-
-### Página 404 em rotas dinâmicas após deploy
-
-**Sintoma:** Rotas como `/folliculitis-shampoo` retornam 404 no Cloudflare mas funcionam localmente.
-
-**Solução:** Confirme que o `output` está como `"server"` no `astro.config.mjs` — sem SSR, as rotas não são geradas como Functions.
+**Fix:**
+1. Confirm `PUBLIC_SHOPIFY_STORE_DOMAIN` and `PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` in the Cloudflare dashboard
+2. Verify that the Shopify app has the `unauthenticated_read_product_listings` scope enabled
 
 ---
 
-*Última atualização: 11/05/2026*
+### Deploy rejected due to bundle size
+
+**Symptom:** `Error: Script size exceeds limit`.
+
+**Fix:** Verify that images are stored in `/public` (static assets) and not imported as JS modules inside SSR components.
+
+---
+
+### 404 on dynamic routes after deploy
+
+**Symptom:** Routes like `/folliculitis-shampoo` return 404 on Cloudflare but work locally.
+
+**Fix:** Confirm that `output` is set to `"server"` in `astro.config.mjs` — without SSR, routes are not generated as Edge Functions.
+
+---
+
+*Last updated: 05/11/2026*
