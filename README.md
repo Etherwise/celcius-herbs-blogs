@@ -182,6 +182,8 @@ import logo from "@/assets/Logo/Logo.avif";
 
 All `CART_ERRORS` messages are in English. Toast them directly in the calling component.
 
+> **Note — Cart persistence across domains:** Cart persistence between the new Astro front-end and the original Shopify pages is domain-dependent. Once the project is under the same domain on Cloudflare, cookie synchronization will allow the Astro front-end and the Shopify back-end to share the same session.
+
 All functions in **`src/lib/shopify/storefront.ts`** have try-catch:
 - Read functions (`getProduct`, `getCollection`, `getCart`, etc.) — catch logs and returns `null`/`[]`.
 - Mutation functions (`createCart`, `addCartLines`, `updateCartLines`, `removeCartLines`) — catch logs and **rethrows** so callers can surface the error to the user.

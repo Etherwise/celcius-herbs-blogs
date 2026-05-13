@@ -79,6 +79,8 @@ PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_token_here
 
 ### 3.1 Build command
 
+First, run `npm run build` to generate the final version of the site.
+
 ```bash
 npm run build
 ```
@@ -189,8 +191,10 @@ npm run build
 
 ### Step 3 — Publish to Cloudflare Pages
 
+Then, use the command below to push the updates directly to Cloudflare's servers. This process ensures that all Astro performance optimizations are applied. Replace `NOME_DO_PROJETO` with the project name chosen in the Cloudflare dashboard.
+
 ```bash
-wrangler pages deploy ./dist --project-name celsius-herbs
+npx wrangler pages deploy ./dist --project-name NOME_DO_PROJETO
 ```
 
 ### Step 4 — Configure Secrets via CLI
