@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@nanostores/react";
-import { Search, ShoppingBag, User } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   updateCartLines,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/shopify/cart-store";
 import { calcCartSubtotal } from "@/lib/shopify/cart-line-helpers";
 import CartLines from "@/components/CartLines";
-import CartDrawer, { $cartOpen } from "@/components/CartDrawer";
+import CartDrawer from "@/components/CartDrawer";
 import { toast } from "sonner";
 
 export default function CartBagPage() {
@@ -26,8 +26,6 @@ export default function CartBagPage() {
   useEffect(() => {
     hydrateShopifyCart().finally(() => setHydrated(true));
   }, []);
-
-  const setCartOpen = (v: boolean) => $cartOpen.set(v);
 
   const handleQtyChange = async (lineId: string, newQty: number) => {
     const cartId = $shopifyCartId.get();
@@ -61,53 +59,6 @@ export default function CartBagPage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <CartDrawer />
-
-      <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
-        Free shipping on orders over $24.99 · Free skincare quiz with every
-        order
-      </div>
-
-      <header className="border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-5 lg:px-10 h-16 lg:h-20 flex items-center justify-between gap-3 sm:gap-6">
-          <nav className="hidden md:flex items-center gap-7 text-sm tracking-wide text-muted-foreground flex-1">
-            <a href="/" className="hover:text-foreground transition">
-              Shop
-            </a>
-            <a href="/" className="hover:text-foreground transition">
-              Best Sellers
-            </a>
-            <a href="/" className="hover:text-foreground transition">
-              Skin Quiz
-            </a>
-            <a href="/" className="hover:text-foreground transition">
-              Find In Stores
-            </a>
-          </nav>
-          <a
-            href="/"
-            className="font-serif text-base sm:text-xl lg:text-2xl tracking-[0.18em] sm:tracking-[0.22em] md:absolute md:left-1/2 md:-translate-x-1/2 whitespace-nowrap min-w-0 truncate"
-          >
-            CELSIUS<span className="text-accent"> · </span>HERBS
-          </a>
-          <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
-            <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-            <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button
-              type="button"
-              className="relative"
-              aria-label="Cart"
-              onClick={() => setCartOpen(true)}
-            >
-              <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              {(cart?.totalQuantity ?? 0) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
-                  {cart!.totalQuantity}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
 
       <div className="max-w-[1320px] mx-auto px-4 sm:px-5 lg:px-10 pt-6 text-[11px] tracking-[0.15em] uppercase text-muted-foreground">
         <a href="/" className="hover:text-foreground">

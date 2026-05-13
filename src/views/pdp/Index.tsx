@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@nanostores/react";
 import {
-  Heart, Search, ShoppingBag, User, Plus, Minus, Check, Star,
+  Heart, Plus, Minus, Check, Star,
   Leaf, ShieldCheck, FlaskConical, Sparkles, Sun, Moon, Truck, RotateCcw, Award,
   ChevronRight, ChevronLeft, Zap, Rabbit, Sprout, Flag,
-  StethoscopeIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -48,7 +47,6 @@ import badgeCrueltyFree from "@/assets/badge-cruelty-free.png";
 import badgeUsdaOrganic from "@/assets/badge-usda-organic.png";
 import badgeVegan from "@/assets/badge-vegan.png";
 import badgeMadeInUsa from "@/assets/badge-made-in-usa.png";
-import { Line } from "recharts";
 
 
 const PDP_PRODUCT_NAME = "organic-bakuchiol-booster-serum";
@@ -720,7 +718,7 @@ const Index = () => {
   // until then we keep a shimmer overlay over the poster so the swap
   // feels seamless instead of janky.
   const [videoReady, setVideoReady] = useState(false);
-  const [cartOpen, setCartOpen] = [useStore($cartOpen), (v: boolean) => $cartOpen.set(v)];
+  const setCartOpen = (v: boolean) => $cartOpen.set(v);
   const cart = useStore($shopifyCart);
   const [isAdding, setIsAdding] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -849,41 +847,6 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <CartDrawer />
-
-      {/* Announcement */}
-      <div className="bg-ink-deep text-primary-foreground text-center text-[11px] tracking-[0.18em] uppercase py-2.5 px-4">
-        Free shipping on orders over $24.99 · Free skincare quiz with every order
-      </div>
-
-      {/* Header */}
-      <header className="border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-5 lg:px-10 h-16 lg:h-20 flex items-center justify-between gap-3 sm:gap-6">
-          <nav className="hidden md:flex items-center gap-7 text-sm tracking-wide text-muted-foreground flex-1">
-            <a href="#" className="hover:text-foreground transition">Shop</a>
-            <a href="#" className="hover:text-foreground transition">Best Sellers</a>
-            <a href="#" className="hover:text-foreground transition">Skin Quiz</a>
-            <a href="#" className="hover:text-foreground transition">Find In Stores</a>
-          </nav>
-          <a
-            href="/"
-            className="font-serif text-base sm:text-xl lg:text-2xl tracking-[0.18em] sm:tracking-[0.22em] md:absolute md:left-1/2 md:-translate-x-1/2 whitespace-nowrap min-w-0 truncate"
-          >
-            CELSIUS<span className="text-accent"> · </span>HERBS
-          </a>
-          <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 ml-auto shrink-0">
-            <Search className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-            <User className="h-4 w-4 cursor-pointer hover:text-accent transition hidden md:block" />
-            <button className="relative" aria-label="Cart" onClick={() => setCartOpen(true)}>
-              <ShoppingBag className="h-4 w-4 cursor-pointer hover:text-accent transition" />
-              {(cart?.totalQuantity ?? 0) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[9px] flex items-center justify-center font-medium">
-                  {cart!.totalQuantity}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
 
       {/* Breadcrumb */}
       <div className="max-w-[1320px] mx-auto px-4 sm:px-5 lg:px-10 pt-6 text-[11px] tracking-[0.15em] uppercase text-muted-foreground overflow-x-auto scrollbar-hide whitespace-nowrap">
@@ -1703,34 +1666,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-ink-deep text-primary-foreground py-12">
-        <div className="max-w-[1320px] mx-auto px-5 lg:px-10 grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-          <div className="col-span-2 md:col-span-1">
-            <div className="font-serif text-xl tracking-[0.22em] mb-3">CELSIUS<span className="text-accent"> · </span>HERBS</div>
-            <p className="text-xs text-primary-foreground/60 leading-relaxed max-w-xs">
-              Plant-powered skincare backed by clinical science. Made in the USA.
-            </p>
-          </div>
-          {[
-            { h: "Shop", l: ["All Skincare", "Serums", "Moisturizers", "Best Sellers"] },
-            { h: "Help", l: ["Contact", "Shipping", "Returns", "FAQ"] },
-            { h: "Company", l: ["About", "Ingredients", "Sustainability", "Press"] },
-          ].map((c) => (
-            <div key={c.h}>
-              <div className="text-[11px] tracking-[0.2em] uppercase text-primary-foreground/50 mb-3">{c.h}</div>
-              <ul className="space-y-2 text-sm">
-                {c.l.map((i) => (
-                  <li key={i}><a href="#" className="hover:text-accent transition">{i}</a></li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="max-w-[1320px] mx-auto px-5 lg:px-10 pt-6 border-t border-primary-foreground/10 text-[11px] text-primary-foreground/40 tracking-wider">
-          © 2026 Celsius Herbs. All rights reserved.
-        </div>
-      </footer>
     </div>
   );
 };

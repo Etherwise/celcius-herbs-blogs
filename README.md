@@ -122,3 +122,83 @@ Blog articles live under **`src/views/blog/`** and **`src/islands/blog/`**; rout
 
 - **`src/views/common/`** — shared pages such as `NotFound`.
 - **`src/islands/common/`** — matching islands (e.g. 404).
+
+---
+
+## Architecture — Global Header & Footer
+
+`SiteHeader` and `SiteFooter` are mounted once in **`src/layouts/Layout.astro`**. PDPs and other pages **must not** include their own inline header or footer.
+
+```astro
+<!-- Layout.astro fetches menus server-side, then mounts both islands -->
+<SiteHeaderIsland client:load mainMenu={mainMenu} shopAllMenu={shopAllMenu} policiesMenu={policiesMenu} />
+<!-- page slot -->
+<SiteFooterIsland client:load quickLinks={quickLinks} supportPolicies={supportPolicies} />
+```
+
+- Menus are fetched from Shopify via `getMenu()` at request time; if Shopify is unavailable, hardcoded fallback arrays are used automatically.
+- Each PDP still mounts its own **`<CartDrawer />`** — the header only calls `$cartOpen.set(true)`, it does not render the drawer.
+- Use `<Layout>` in every `.astro` route to get the shared header, footer, and SEO tags.
+
+---
+
+## CSS Design System
+
+Reusable component classes are defined in **`src/styles/global.css`** under `@layer components`:
+
+| Class | Applied to |
+|---|---|
+| `nav-header-grid` | Desktop `<nav>` container in SiteHeader |
+| `nav-link-blue` | Desktop nav links and dropdown sub-items |
+| `nav-link-black` | Mobile top-level nav links |
+| `footer-heading` | Column headings in SiteFooter (bold, non-clickable) |
+| `footer-link` | All clickable links in SiteFooter |
+
+Use these classes instead of inline Tailwind when adding new nav or footer items.
+
+---
+
+## Static Assets — Logo
+
+The logo is served from **`public/Logo/Logo.avif`**. Reference it with a plain path string — **do not import it** via ES module syntax in React islands (Vite does not resolve `.avif` at runtime in island components):
+
+```tsx
+// correct
+<img src="/Logo/Logo.avif" alt="Celsius Organic Herbs" className="h-10 w-auto" />
+
+// wrong — don't do this in a React island
+import logo from "@/assets/Logo/Logo.avif";
+```
+
+---
+
+## Cart Error Handling
+
+`handleAddToCartRule` in **`src/lib/shopify/cart-actions.ts`** runs three checks before any Shopify call:
+
+1. **No internet** → throws `CART_ERRORS.NO_INTERNET` ("No internet connection…")
+2. **API not configured** (`getStorefrontClient()` returns null) → throws `CART_ERRORS.SERVER_NO_RESPONSE` ("No response from server…")
+3. **API network failure** (any unrecognized exception from Shopify mutations) → `rethrowAsConnection()` converts it to `CART_ERRORS.SHOPIFY_CONNECTION` ("Error connecting to Shopify…")
+
+All `CART_ERRORS` messages are in English. Toast them directly in the calling component.
+
+All functions in **`src/lib/shopify/storefront.ts`** have try-catch:
+- Read functions (`getProduct`, `getCollection`, `getCart`, etc.) — catch logs and returns `null`/`[]`.
+- Mutation functions (`createCart`, `addCartLines`, `updateCartLines`, `removeCartLines`) — catch logs and **rethrows** so callers can surface the error to the user.
+
+---
+
+## Changelog
+
+### 2026-05 — Normalized header/footer and cart hardening
+
+- **Global header/footer**: Extracted `SiteHeader` and `SiteFooter` into `Layout.astro` islands. Removed inline headers/footers from all 7 PDPs and `CartBagPage`.
+- **CSS design system**: Added `nav-header-grid`, `nav-link-blue`, `nav-link-black`, `footer-heading`, `footer-link` to `global.css` `@layer components`.
+- **Logo**: Moved from `src/assets/Logo/Logo.avif` to `public/Logo/Logo.avif`; increased display size (lg: h-16).
+- **Dropdown hover fix**: Added 300 ms delay before closing nav dropdowns (prevents accidental close when moving mouse to submenu).
+- **Cart errors**: Added layered error handling in `handleAddToCartRule` (internet check → API config check → connection error → business errors). All messages in English.
+- **Storefront try-catch**: All 10 public functions in `storefront.ts` now have try-catch; mutations rethrow for callers.
+- **Responsive footer**: Footer grid uses `sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5` to prevent orphaned columns at tablet width.
+- **Removed `/shopify-collections`**: Page deleted; all references replaced with the live Shopify collections URL.
+- **CartDrawer casing fix**: Renamed `cartdrawer.tsx` → `CartDrawer.tsx` to resolve TS1149 casing mismatch.
+- **Cursor rule updated**: `.cursor/rules/pdp-shopify-cart.mdc` updated to document the normalized header/footer architecture and CSS class design system.

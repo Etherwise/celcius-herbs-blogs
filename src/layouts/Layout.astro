@@ -1,5 +1,8 @@
 ---
 import "../styles/global.css";
+import { getMenu } from "../lib/shopify/storefront";
+import SiteHeaderIsland from "../islands/SiteHeader";
+import SiteFooterIsland from "../islands/SiteFooter";
 
 interface Props {
   title: string;
@@ -26,6 +29,22 @@ const {
 
 const resolvedOgTitle = ogTitle ?? title;
 const resolvedOgDescription = ogDescription ?? description;
+
+// Fetch all menus in parallel; fall back to empty arrays on error
+const [mainMenuResult, shopAllResult, policiesResult, quickLinksResult, supportPoliciesResult] =
+  await Promise.allSettled([
+    getMenu("main-menu"),
+    getMenu("shop-all"),
+    getMenu("polices"),       // handle name per task spec (note: intentional typo)
+    getMenu("quick-links"),
+    getMenu("support-policies"),
+  ]);
+
+const mainMenu       = mainMenuResult.status       === "fulfilled" ? (mainMenuResult.value?.items       ?? []) : [];
+const shopAllMenu    = shopAllResult.status         === "fulfilled" ? (shopAllResult.value?.items        ?? []) : [];
+const policiesMenu   = policiesResult.status        === "fulfilled" ? (policiesResult.value?.items       ?? []) : [];
+const quickLinks     = quickLinksResult.status      === "fulfilled" ? (quickLinksResult.value?.items     ?? []) : [];
+const supportPolicies = supportPoliciesResult.status === "fulfilled" ? (supportPoliciesResult.value?.items ?? []) : [];
 ---
 
 <!doctype html>
@@ -60,6 +79,19 @@ const resolvedOgDescription = ogDescription ?? description;
     }
   </head>
   <body>
+    <SiteHeaderIsland
+      mainMenu={mainMenu}
+      shopAllMenu={shopAllMenu}
+      policiesMenu={policiesMenu}
+      client:load
+    />
+
     <slot />
+
+    <SiteFooterIsland
+      quickLinks={quickLinks}
+      supportPolicies={supportPolicies}
+      client:load
+    />
   </body>
 </html>

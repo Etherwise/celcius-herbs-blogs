@@ -1,4 +1,5 @@
 import { $shopifyCartId, syncShopifyCart } from "@/lib/shopify/cart-store";
+import { getStorefrontClient } from "@/lib/shopify/client";
 import {
   addCartLines,
   createCart,
@@ -19,11 +20,21 @@ export type AddToCartInput = {
 };
 
 export const CART_ERRORS = {
+  NO_INTERNET: "No internet connection. Please check your network and try again.",
+  SERVER_NO_RESPONSE: "No response from server, please try again later.",
+  SHOPIFY_CONNECTION: "Error connecting to Shopify, please try again later.",
   PRODUCT_NOT_FOUND: "Product unavailable. Please try again later.",
   BUNDLE_NOT_FOUND: "Bundle option not available for this product.",
   VARIANT_OUT_OF_STOCK: "This option is currently out of stock.",
   CART_UPDATE_FAILED: "Could not update cart. Please try again.",
 } as const;
+
+const KNOWN_ERRORS = new Set(Object.values(CART_ERRORS));
+
+function rethrowAsConnection(err: unknown): never {
+  if (err instanceof Error && KNOWN_ERRORS.has(err.message as never)) throw err;
+  throw new Error(CART_ERRORS.SHOPIFY_CONNECTION);
+}
 
 /**
  * Resolves the correct Shopify variant based on `size`.
@@ -89,6 +100,16 @@ export async function handleAddToCartRule({
   qty,
   cart,
 }: AddToCartInput): Promise<Cart | null> {
+  // 1. Internet connectivity check
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    throw new Error(CART_ERRORS.NO_INTERNET);
+  }
+
+  // 2. Shopify API availability check (credentials not configured or client failed to init)
+  if (!getStorefrontClient()) {
+    throw new Error(CART_ERRORS.SERVER_NO_RESPONSE);
+  }
+
   const product = await getProduct(productName);
   if (!product) throw new Error(CART_ERRORS.PRODUCT_NOT_FOUND);
 
@@ -106,35 +127,39 @@ export async function handleAddToCartRule({
   const cartId = raw?.startsWith("gid://shopify/Cart/") ? raw : null;
   let updated: Cart | null = null;
 
-  if (cartId && cart) {
-    const existingLine = cart.lines.find(
-      (l) =>
-        l.merchandise.id === variantId &&
-        lineOfferMatches(l.attributes, size, purchase)
-    );
+  try {
+    if (cartId && cart) {
+      const existingLine = cart.lines.find(
+        (l) =>
+          l.merchandise.id === variantId &&
+          lineOfferMatches(l.attributes, size, purchase)
+      );
 
-    if (existingLine) {
-      updated = await updateCartLines(cartId, [
-        {
-          id: existingLine.id,
-          quantity: existingLine.quantity + cartQty,
-          attributes: lineAttributes,
-        },
-      ]);
-    } else {
-      updated = await addCartLines(cartId, [
+      if (existingLine) {
+        updated = await updateCartLines(cartId, [
+          {
+            id: existingLine.id,
+            quantity: existingLine.quantity + cartQty,
+            attributes: lineAttributes,
+          },
+        ]);
+      } else {
+        updated = await addCartLines(cartId, [
+          { merchandiseId: variantId, quantity: cartQty, attributes: lineAttributes },
+        ]);
+      }
+    }
+
+    if (!updated) {
+      updated = await createCart([
         { merchandiseId: variantId, quantity: cartQty, attributes: lineAttributes },
       ]);
+      if (updated) {
+        localStorage.setItem("shopify_cart_id", updated.id);
+      }
     }
-  }
-
-  if (!updated) {
-    updated = await createCart([
-      { merchandiseId: variantId, quantity: cartQty, attributes: lineAttributes },
-    ]);
-    if (updated) {
-      localStorage.setItem("shopify_cart_id", updated.id);
-    }
+  } catch (err) {
+    rethrowAsConnection(err);
   }
 
   if (!updated) throw new Error(CART_ERRORS.CART_UPDATE_FAILED);

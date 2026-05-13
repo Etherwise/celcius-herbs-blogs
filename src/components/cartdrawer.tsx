@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useStore } from "@nanostores/react";
 import { atom } from "nanostores";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -79,11 +79,11 @@ const CartDrawer = () => {
   return (
     <Sheet open={open} onOpenChange={(v) => $cartOpen.set(v)}>
       <SheetContent side="right" className="flex flex-col p-0 w-full sm:max-w-md">
-        <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
-          <SheetTitle className="font-serif text-xl tracking-tight">
+        <SheetHeader className="px-6 py-5 border-b border-[#3a8ec0] shrink-0 bg-[#3a8ec0]">
+          <SheetTitle className="font-serif text-xl tracking-tight text-white">
             Your Bag
             {!isEmpty && (
-              <span className="ml-2 text-sm font-sans font-normal text-muted-foreground">
+              <span className="ml-2 text-sm font-sans font-normal text-white/80">
                 ({cart.totalQuantity}{" "}
                 {cart.totalQuantity === 1 ? "item" : "items"})
               </span>
@@ -93,8 +93,8 @@ const CartDrawer = () => {
 
         {isEmpty ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-            <ShoppingBag
-              className="h-12 w-12 text-muted-foreground/30"
+            <ShoppingCart
+              className="h-12 w-12 text-[#3a8ec0]/30"
               strokeWidth={1}
             />
             <div>
@@ -141,14 +141,14 @@ const CartDrawer = () => {
                   <a
                     href="/cart"
                     onClick={() => $cartOpen.set(false)}
-                    className="flex items-center justify-center w-full h-11 rounded-md border border-border text-xs tracking-[0.15em] uppercase font-medium hover:bg-secondary transition"
+                    className="flex items-center justify-center w-full h-11 rounded-md border border-[#3a8ec0] text-[#3a8ec0] text-xs tracking-[0.15em] uppercase font-medium hover:bg-[#3a8ec0]/5 transition"
                   >
                     View bag
                   </a>
 
                   <a
                     href={cart.checkoutUrl}
-                    className="flex items-center justify-center w-full h-12 rounded-md bg-foreground text-background text-xs tracking-[0.15em] uppercase font-medium hover:bg-foreground/90 transition"
+                    className="flex items-center justify-center w-full h-12 rounded-md bg-[#3a8ec0] text-white text-xs tracking-[0.15em] uppercase font-medium hover:bg-[#2d7aad] transition"
                   >
                     Checkout · {currency} {subtotal.toFixed(2)}
                   </a>

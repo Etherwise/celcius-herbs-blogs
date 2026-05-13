@@ -93,6 +93,28 @@
   }
 }
 
+@layer components {
+  .nav-header-grid {
+    @apply flex flex-wrap items-center gap-x-10 gap-y-5 p-5 font-sans text-[19px];
+  }
+
+  .nav-link-blue {
+    @apply text-[#003366] font-medium no-underline hover:opacity-80;
+  }
+
+  .nav-link-black {
+    @apply text-black font-semibold no-underline hover:opacity-80;
+  }
+
+  .footer-heading {
+  @apply text-black font-semibold text-lg mb-6 tracking-tight font-sans;
+}
+
+  .footer-link {
+    @apply text-[#003366] font-medium text-sm no-underline hover:opacity-80;
+  }
+}
+
 @layer utilities {
   .text-gold { color: hsl(var(--gold)); }
   .bg-gold { background-color: hsl(var(--gold)); }
