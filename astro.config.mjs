@@ -33,6 +33,14 @@ export default defineConfig({
   adapter: cloudflare(),
   output:"server",
   integrations: [react()],
+  // 301 old /blog/cat-ear-infection URL (subdomain has /blog/ baked in by name,
+  // so the path is redundant). Preserves any external links already shared.
+  redirects: {
+    "/blog/cat-ear-infection": {
+      status: 301,
+      destination: "/cat-ear-infection",
+    },
+  },
   vite: {
     plugins: [imageAsUrlPlugin],
     resolve: {

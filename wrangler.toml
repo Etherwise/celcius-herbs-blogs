@@ -41,6 +41,6 @@ compatibility_flags = ["nodejs_compat"]
 #     Pages → celsius-herbs → Settings → Environment variables → Add secret
 # ----------------------------------------------------------------------------
 [vars]
-PUBLIC_SHOPIFY_STORE_DOMAIN           = ""
-PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN = ""
+PUBLIC_SHOPIFY_STORE_DOMAIN           = "yourDomain.myshopify.com"
+PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN   = "API_Key"
 # PUBLIC_SHOPIFY_API_VERSION          = "2026-01"  # uncomment to pin the API version
