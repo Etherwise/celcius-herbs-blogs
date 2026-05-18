@@ -1,206 +1,196 @@
-# Celsius Herbs — Astro storefront
+# Celsius Herbs — Headless Blog & Storefront Framework
 
-Custom **Astro** site with **React** islands (shadcn/Radix PDPs). This is **not** inside the Shopify Liquid theme: it is a **headless** layer that can use the **same store and products** via the **Storefront API** (build-time SEO) while your existing theme continues to run the native Online Store if you still use it.
+> Astro 5 · React Islands · Shopify Storefront API · Cloudflare Pages · GitHub Actions CI/CD
 
-## Scripts
-
-- `npm run dev` — local dev (Astro)
-- `npm run build` — static production build
-- `npm run preview` — preview the build
-- `npm test` — Vitest
-
-## Environment (Shopify)
-
-Copy `.env.example` to `.env` and set:
-
-- `PUBLIC_SHOPIFY_STORE_DOMAIN` — e.g. `your-store.myshopify.com` (no `https://`)
-- `PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN` — Storefront API access token (public storefront token is normal for headless)
-- Optional: `PUBLIC_SHOPIFY_API_VERSION`
-
-If these are missing, PDPs still build using **static** meta from each `.astro` file.
+Headless front-end for **celsiusherbs.com**. The blog lives at `blog.celsiusherbs.com` and product detail pages live in this same framework, fed by the Shopify Storefront API for shared header/footer/cart state. The main `celsiusherbs.com` Shopify storefront is unchanged.
 
 ---
 
-## Adding a new PDP (developer checklist)
+## 🚀 Quick Start
 
-Use this when you add a product page that should align with **Shopify Admin** (same catalog as your theme) without editing Liquid.
+```bash
+# 1. Install dependencies (npm — bun.lock is included as backup but npm is canonical)
+npm install
 
-### How this relates to the Shopify theme
+# 2. Copy environment template and fill in your Shopify Storefront token
+cp .env.example .env
+# Edit .env: set PUBLIC_SHOPIFY_STORE_DOMAIN and PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN
 
-- The **theme** (Liquid, OS 2.0) lives in Shopify Admin → Online Store → Themes (or a separate theme repo).
-- This repo is a **custom storefront**: same **products** and **handles** as Admin; optional **Storefront API** calls at **build time** merge SEO into the Astro layout. PDP UI is **React** in `src/views/pdp/`, not Liquid.
+# 3. Run dev server (Astro at http://localhost:8080)
+npm run dev
 
-### 1. Choose the URL slug
+# 4. Production build (output goes to ./dist)
+npm run build
 
-`src/pages/{slug}.astro` maps to `/{slug}` on the site (subject to your host’s trailing-slash behavior).
+# 5. Preview the production build locally
+npm run preview
+```
 
-Example: `src/pages/new-product.astro` → `/new-product`.
+**Node version**: 22.16.0 (pinned via `.nvmrc`). If you use `nvm`, run `nvm use` to switch automatically.
 
-### 2. Add the React PDP
+---
 
-Create **`src/views/pdp/YourProductName.tsx`** — default export component for the full page. Follow an existing PDP in that folder for layout, `@/components/ui/*`, and `@/assets/*` imports.
+## 📐 Architecture
 
-### 3. Add the island wrapper
+```
+                                 ┌─────────────────────────┐
+                                 │     User Browser        │
+                                 └────────────┬────────────┘
+                                              │
+                  ┌───────────────────────────┴───────────────────────────┐
+                  ▼                                                       ▼
+        celsiusherbs.com                                blog.celsiusherbs.com
+        (Shopify storefront,                            (this Astro framework
+        unchanged)                                      on Cloudflare Pages)
+                                                                │
+                                                                ▼
+                                            ┌──────────────────────────────────┐
+                                            │ Astro 5 SSR (Cloudflare Workers) │
+                                            │  ├─ React islands (PDPs, blog)   │
+                                            │  ├─ Shopify Storefront API       │
+                                            │  │   (header/footer menus, cart) │
+                                            │  └─ JSON-LD schema rendering     │
+                                            └──────────────────────────────────┘
+```
 
-Create **`src/islands/pdp/YourProductName.tsx`**:
+**Key concepts:**
+
+- **Astro 5 SSR** with `@astrojs/cloudflare` adapter — pages render at the edge on Cloudflare Workers
+- **React islands** — interactive UI (PDPs, blog content, cart drawer) hydrated client-side; static shell rendered server-side
+- **Shopify Storefront API** — fetches menus, products, and creates cart/checkout. Token is public-safe (browser-exposed by design)
+- **JSON-LD schemas** — every blog post and PDP emits `Article`/`Product`/`FAQPage` structured data for SEO
+
+---
+
+## 📂 Project Structure (high-level)
+
+See `docs/FOLDER-STRUCTURE.md` for the full annotated tree.
+
+```
+src/
+├── pages/          # Astro routes — each .astro file is a URL
+│   ├── cat-ear-infection.astro   ← blog post (served at /cat-ear-infection)
+│   ├── ear-infection-drops.astro ← PDP
+│   └── ...
+├── views/          # Page-level React components (rendered inside islands)
+│   ├── blog/       # Blog post bodies
+│   └── pdp/        # Product detail page bodies
+├── islands/        # Thin React island wrappers (for Astro's `client:load`)
+├── components/     # Shared React components (CartDrawer, SiteHeader, etc.)
+├── layouts/        # Astro layouts (Layout.astro wraps every page)
+├── lib/            # Server-side helpers
+│   ├── blog/       # Blog-specific (FAQ arrays, JSON-LD builders)
+│   └── shopify/    # Storefront API client + GraphQL queries
+├── assets/         # Build-time imported assets (images, fonts)
+└── styles/         # Global CSS (Tailwind base)
+
+docs/               # Documentation (this file + companions below)
+public/             # Static assets served as-is (favicon, robots.txt, logo)
+.github/workflows/  # GitHub Actions (auto-deploy to Cloudflare Pages)
+```
+
+---
+
+## 📝 Adding a new blog post
+
+**See `docs/ADDING-A-BLOG-POST.md` for the step-by-step playbook.** Quick summary:
+
+Each post is 4 files:
+1. **Page** — `src/pages/<slug>.astro` — Astro route + SEO meta + JSON-LD
+2. **Island** — `src/islands/blog/<Name>Guide.tsx` — thin React wrapper
+3. **View** — `src/views/blog/<Name>Guide.tsx` — the actual blog content (headings, paragraphs, images)
+4. **FAQ data** — `src/lib/blog/<slug>-faqs.ts` — FAQ array + JSON-LD builders
+
+Use the existing `cat-ear-infection` post as the reference template.
+
+---
+
+## 🚢 Deployment
+
+**See `docs/DEPLOYMENT.md` for the full deployment guide.** Quick summary:
+
+- **Production URL**: https://blog.celsiusherbs.com
+- **Cloudflare Pages project**: `deploy-celsius-herbs-dev`
+- **Auto-deploy**: every push to `main` triggers GitHub Actions → builds → deploys to Cloudflare Pages in ~90 seconds
+- **Manual deploy**: from any branch, run `npm run build && npx wrangler pages deploy dist --project-name=deploy-celsius-herbs-dev`
+
+---
+
+## 🐛 Common Gotchas
+
+### File case sensitivity (macOS vs Linux CI)
+macOS is case-insensitive by default; the Linux CI runner is case-sensitive. If you rename a file's casing locally (e.g. `cartdrawer.tsx` → `CartDrawer.tsx`), git may not track the change. Workaround:
+
+```bash
+git mv -f src/components/cartdrawer.tsx src/components/__tmp.tsx
+git mv -f src/components/__tmp.tsx src/components/CartDrawer.tsx
+git commit -m "Fix case"
+```
+
+This repo has `core.ignorecase=false` set locally to catch case-sensitivity bugs early. Keep it that way.
+
+### Image imports rendering as `[object Object]`
+Astro 5 transforms image imports (`.jpg`, `.png`, `.webp`) into `ImageMetadata` objects. React components expect plain URL strings. The `imageAsUrlPlugin` in `astro.config.mjs` rewrites these imports — you don't need to do anything special. Just import images normally:
 
 ```tsx
-import PageRoot from "@/components/PageRoot";
-import YourProductName from "@/views/pdp/YourProductName";
-
-export default function YourProductNameIsland() {
-  return (
-    <PageRoot>
-      <YourProductName />
-    </PageRoot>
-  );
-}
+import heroImage from "@/assets/blog/cat-ear-hero.webp";
+<img src={heroImage} alt="..." />
 ```
 
-`PageRoot` provides React Query, tooltips, and toasters like other PDPs.
+### Cloudflare Pages 502 on local `wrangler pages deploy`
+Large dist sizes (>50MB) over slow upload bandwidth can hit Cloudflare's 60s API timeout. **Use the GitHub Actions workflow (auto-triggered on push) instead.** CI runners have datacenter-grade bandwidth and don't hit this wall.
 
-### 4. Add the Astro route
-
-Create **`src/pages/{slug}.astro`** using the same pattern as `src/pages/cat-dandruff-lotion.astro`:
-
-- Import `Layout`, `../islands/pdp/YourProductName`, and `mergeShopifyProductSeo` + `SHOPIFY_PRODUCT_HANDLES` from `../lib/shopify`.
-- Set **`staticMeta`**: `title`, `description`, `canonical`, and optionally `ogTitle`, `ogDescription`, `ogImage`, `ogType`.
-- Run:
-
-  ```ts
-  const merged = await mergeShopifyProductSeo(SHOPIFY_PRODUCT_HANDLES.yourKey, staticMeta);
-  const { jsonLd, ...layoutProps } = merged;
-  ```
-
-- Render:
-
-  ```astro
-  <Layout {...layoutProps} jsonLd={jsonLd}>
-    <YourProductNameIsland client:load />
-  </Layout>
-  ```
-
-### 5. Map the product handle (optional SEO from Shopify)
-
-Edit **`src/lib/shopify/handles.ts`**:
-
-- Add a key to **`SHOPIFY_PRODUCT_HANDLES`**, e.g. `yourProductName: 'exact-shopify-product-handle'`.
-- The handle is the product slug in Admin (same as `/products/{handle}` on the Online Store).
-- Use **`null`** until the product exists or you want to keep only static meta from the `.astro` file.
-
-On **`npm run build`**, when env vars and a non-null handle are set, titles/descriptions/canonical/OG image can be merged from Storefront; otherwise **`staticMeta`** is used.
-
-### 6. Canonical, checkout, and the theme
-
-- **Catalog**: Use the same product in Admin the theme uses; keep handles in sync in `handles.ts`.
-- **Canonical**: Decide whether this Astro URL or the theme product URL should win for SEO. Storefront’s `onlineStoreUrl` may override canonical when merge succeeds; otherwise your `staticMeta.canonical` applies.
-- **Checkout**: This repo does not wire cart/checkout by default. Sending shoppers to the theme usually means cart permalinks, Storefront cart, Buy Button, or similar—plan that separately.
-
-### 7. Verify
-
-- `npm run dev` — open the new path.
-- With `.env` and handles set — `npm run build` and inspect `<title>`, meta description, and JSON-LD in the built HTML.
-
-### 8. Internal links
-
-Use **`<a href="/your-slug">`** (or your production origin) from other pages so navigation hits this Astro route.
-
-### Files touched per PDP
-
-| Purpose        | Path                                      |
-|----------------|-------------------------------------------|
-| PDP UI (React) | `src/views/pdp/<Name>.tsx`                |
-| Island wrapper | `src/islands/pdp/<Name>.tsx`              |
-| Route + SEO    | `src/pages/<slug>.astro`                  |
-| Shopify handle | `src/lib/shopify/handles.ts`              |
-
-### Blogs
-
-Blog articles live under **`src/views/blog/`** and **`src/islands/blog/`**; routes go under **`src/pages/blog/`** (see `folliculitis-guide.astro`).
-
-### Other folders
-
-- **`src/views/common/`** — shared pages such as `NotFound`.
-- **`src/islands/common/`** — matching islands (e.g. 404).
+### Build warnings (safe to ignore)
+- `[adapter] Cloudflare does not support sharp at runtime` — informational, image optimization happens at build time
+- `Browserslist: browsers data is X months old` — informational, doesn't affect output
+- npm deprecation warnings — transitive dependencies, not breaking
 
 ---
 
-## Architecture — Global Header & Footer
+## 🛠️ Scripts
 
-`SiteHeader` and `SiteFooter` are mounted once in **`src/layouts/Layout.astro`**. PDPs and other pages **must not** include their own inline header or footer.
-
-```astro
-<!-- Layout.astro fetches menus server-side, then mounts both islands -->
-<SiteHeaderIsland client:load mainMenu={mainMenu} shopAllMenu={shopAllMenu} policiesMenu={policiesMenu} />
-<!-- page slot -->
-<SiteFooterIsland client:load quickLinks={quickLinks} supportPolicies={supportPolicies} />
-```
-
-- Menus are fetched from Shopify via `getMenu()` at request time; if Shopify is unavailable, hardcoded fallback arrays are used automatically.
-- Each PDP still mounts its own **`<CartDrawer />`** — the header only calls `$cartOpen.set(true)`, it does not render the drawer.
-- Use `<Layout>` in every `.astro` route to get the shared header, footer, and SEO tags.
-
----
-
-## CSS Design System
-
-Reusable component classes are defined in **`src/styles/global.css`** under `@layer components`:
-
-| Class | Applied to |
+| Command | What it does |
 |---|---|
-| `nav-header-grid` | Desktop `<nav>` container in SiteHeader |
-| `nav-link-blue` | Desktop nav links and dropdown sub-items |
-| `nav-link-black` | Mobile top-level nav links |
-| `footer-heading` | Column headings in SiteFooter (bold, non-clickable) |
-| `footer-link` | All clickable links in SiteFooter |
-
-Use these classes instead of inline Tailwind when adding new nav or footer items.
+| `npm run dev` | Start Astro dev server at http://localhost:8080 |
+| `npm run build` | Production build to `./dist` (Cloudflare Pages format) |
+| `npm run preview` | Locally serve the production build |
+| `npm run lint` | ESLint over the codebase |
+| `npm test` | Run Vitest test suite |
 
 ---
 
-## Static Assets — Logo
+## 📚 Further Reading
 
-The logo is served from **`public/Logo/Logo.avif`**. Reference it with a plain path string — **do not import it** via ES module syntax in React islands (Vite does not resolve `.avif` at runtime in island components):
-
-```tsx
-// correct
-<img src="/Logo/Logo.avif" alt="Celsius Organic Herbs" className="h-10 w-auto" />
-
-// wrong — don't do this in a React island
-import logo from "@/assets/Logo/Logo.avif";
-```
+- `docs/ADDING-A-BLOG-POST.md` — the article-creation playbook
+- `docs/FOLDER-STRUCTURE.md` — full annotated source tree
+- `docs/DEPLOYMENT.md` — CI/CD, secrets, manual deploy steps
+- [Astro 5 docs](https://docs.astro.build/)
+- [@astrojs/cloudflare adapter](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)
+- [Shopify Storefront API](https://shopify.dev/docs/api/storefront)
 
 ---
 
-## Cart Error Handling
+## 🔐 Secrets & Credentials
 
-`handleAddToCartRule` in **`src/lib/shopify/cart-actions.ts`** runs three checks before any Shopify call:
+**Local development**: copy `.env.example` to `.env`, fill in real values.
 
-1. **No internet** → throws `CART_ERRORS.NO_INTERNET` ("No internet connection…")
-2. **API not configured** (`getStorefrontClient()` returns null) → throws `CART_ERRORS.SERVER_NO_RESPONSE` ("No response from server…")
-3. **API network failure** (any unrecognized exception from Shopify mutations) → `rethrowAsConnection()` converts it to `CART_ERRORS.SHOPIFY_CONNECTION` ("Error connecting to Shopify…")
+**Production (Cloudflare Pages env vars)**: set via Cloudflare dashboard or `wrangler pages secret put`.
 
-All `CART_ERRORS` messages are in English. Toast them directly in the calling component.
+**GitHub Actions (CI/CD)**: configured as repository secrets at GitHub → Repo Settings → Secrets and variables → Actions. Required secrets:
 
-> **Note — Cart persistence across domains:** Cart persistence between the new Astro front-end and the original Shopify pages is domain-dependent. Once the project is under the same domain on Cloudflare, cookie synchronization will allow the Astro front-end and the Shopify back-end to share the same session.
-
-All functions in **`src/lib/shopify/storefront.ts`** have try-catch:
-- Read functions (`getProduct`, `getCollection`, `getCart`, etc.) — catch logs and returns `null`/`[]`.
-- Mutation functions (`createCart`, `addCartLines`, `updateCartLines`, `removeCartLines`) — catch logs and **rethrows** so callers can surface the error to the user.
+| Secret name | Used for |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | wrangler authentication |
+| `CLOUDFLARE_ACCOUNT_ID` | wrangler account scope |
+| `PUBLIC_SHOPIFY_STORE_DOMAIN` | Build-time injection |
+| `PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN` | Build-time injection |
 
 ---
 
-## Changelog
+## 📞 Handoff Notes
 
-### 2026-05 — Normalized header/footer and cart hardening
+This framework was set up to ship the first blog post (`cat-ear-infection`) and validate the end-to-end pipeline. The CI/CD, schema markup, image pipeline, Shopify integration, and routing are all production-tested.
 
-- **Global header/footer**: Extracted `SiteHeader` and `SiteFooter` into `Layout.astro` islands. Removed inline headers/footers from all 7 PDPs and `CartBagPage`.
-- **CSS design system**: Added `nav-header-grid`, `nav-link-blue`, `nav-link-black`, `footer-heading`, `footer-link` to `global.css` `@layer components`.
-- **Logo**: Moved from `src/assets/Logo/Logo.avif` to `public/Logo/Logo.avif`; increased display size (lg: h-16).
-- **Dropdown hover fix**: Added 300 ms delay before closing nav dropdowns (prevents accidental close when moving mouse to submenu).
-- **Cart errors**: Added layered error handling in `handleAddToCartRule` (internet check → API config check → connection error → business errors). All messages in English.
-- **Storefront try-catch**: All 10 public functions in `storefront.ts` now have try-catch; mutations rethrow for callers.
-- **Responsive footer**: Footer grid uses `sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5` to prevent orphaned columns at tablet width.
-- **Removed `/shopify-collections`**: Page deleted; all references replaced with the live Shopify collections URL.
-- **CartDrawer casing fix**: Renamed `cartdrawer.tsx` → `CartDrawer.tsx` to resolve TS1149 casing mismatch.
-- **Cursor rule updated**: `.cursor/rules/pdp-shopify-cart.mdc` updated to document the normalized header/footer architecture and CSS class design system.
+Verified working state: commit on `main` branch — production live at https://blog.celsiusherbs.com/cat-ear-infection
+
+For questions about how a specific piece works, the inline comments in source files (especially `astro.config.mjs`, `src/lib/shopify/storefront.ts`, and `src/pages/cat-ear-infection.astro`) explain the design choices.

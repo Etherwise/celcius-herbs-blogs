@@ -4,7 +4,9 @@
 # =============================================================================
 
 # Project name in Cloudflare Pages (must match the name created in the dashboard).
-name = "celsius-herbs"
+# Live production Pages project is "deploy-celsius-herbs-dev" — custom domain
+# blog.celsiusherbs.com is attached to that project.
+name = "deploy-celsius-herbs-dev"
 
 # ----------------------------------------------------------------------------
 # Astro build output directory.
@@ -38,7 +40,10 @@ compatibility_flags = ["nodejs_compat"]
 #
 # ⚠️  WARNING: DO NOT place real tokens or secrets here.
 #     Secrets must be configured via the Cloudflare dashboard:
-#     Pages → celsius-herbs → Settings → Environment variables → Add secret
+#     Pages → deploy-celsius-herbs-dev → Settings → Environment variables → Add secret
+#
+# For local development, copy .env.example to .env and fill in real values there
+# (the .env file is gitignored).
 # ----------------------------------------------------------------------------
 [vars]
 PUBLIC_SHOPIFY_STORE_DOMAIN           = "yourDomain.myshopify.com"
