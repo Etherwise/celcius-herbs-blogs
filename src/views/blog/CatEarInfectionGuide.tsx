@@ -24,6 +24,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { CAT_EAR_INFECTION_FAQS as FAQS } from "@/lib/blog/cat-ear-infection-faqs";
+import { ReviewedByDrAlex } from "@/components/blog/ReviewedByDrAlex";
 
 // Cohesive image set generated via Gemini 3.1 Flash Image Preview ("nano banana")
 // against the brand image style guide at:
@@ -745,11 +746,13 @@ export default function CatEarInfectionGuide() {
               ))}
             </ol>
             <p className="mt-6 text-xs text-muted-foreground/80">
-              Reviewed by the Celsius Herbs veterinary advisory team.
               Educational content only — does not replace individualized
               veterinary diagnosis or treatment.
             </p>
           </section>
+
+          {/* Reviewer attribution (pet articles) */}
+          <ReviewedByDrAlex />
 
           {/* Final CTA back to PDP */}
           <section className="scroll-mt-24 bg-ink-deep text-primary-foreground rounded-3xl p-10 lg:p-14">
