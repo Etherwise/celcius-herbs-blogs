@@ -5,7 +5,7 @@
  * before the final CTA). Reused across all pet posts — only one source of
  * truth for Dr. Alex's photo + credentials.
  *
- * Photo lives at /dr-alex.webp (public/dr-alex.webp). Replace that file to
+ * Photo lives at /dr-alex.png (public/dr-alex.png). Replace that file to
  * update the photo across every article that uses this component.
  *
  * Usage:
@@ -23,7 +23,7 @@ export function ReviewedByDrAlex() {
         {/* Photo */}
         <div className="shrink-0">
           <img
-            src="/dr-alex.webp"
+            src="/dr-alex.png"
             alt="Dr. Alex C, DVM MRCVS — veterinary reviewer"
             className="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover ring-2 ring-background shadow-sm"
             loading="lazy"
