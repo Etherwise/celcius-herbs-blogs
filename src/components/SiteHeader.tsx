@@ -5,6 +5,19 @@ import { $shopifyCart, hydrateShopifyCart } from "@/lib/shopify/cart-store";
 import { $cartOpen } from "@/components/CartDrawer";
 import type { MenuItem } from "@/lib/shopify/storefront";
 
+// Storefront base — when this framework runs on a subdomain (blog.celsiusherbs.com),
+// relative URLs from Shopify menus (e.g. "/", "/shopify-collections") would resolve
+// to the subdomain and break. Absolutify them to the main storefront.
+const STOREFRONT_BASE = "https://celsiusherbs.com";
+
+function absolutifyStorefront(url: string | undefined): string {
+  if (!url) return STOREFRONT_BASE;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("mailto:") || url.startsWith("tel:") || url.startsWith("#")) return url;
+  if (url.startsWith("/")) return STOREFRONT_BASE + url;
+  return STOREFRONT_BASE + "/" + url;
+}
+
 const FALLBACK_SHOP_ALL: MenuItem[] = [
   { id: "humans", title: "Humans", url: "https://celsiusherbs.myshopify.com/collections/humans", type: "COLLECTION", items: [] },
   { id: "pets", title: "Pets", url: "https://celsiusherbs.myshopify.com/collections/pets", type: "COLLECTION", items: [] },
@@ -78,7 +91,7 @@ function NavDropdown({ label, items, href }: { label: string; items: MenuItem[];
           {items.map((item) => (
             <a
               key={item.id}
-              href={item.url}
+              href={absolutifyStorefront(item.url)}
               className="nav-link-blue block px-4 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
             >
               {item.title}
@@ -106,15 +119,17 @@ export default function SiteHeader({ mainMenu = [], shopAllMenu = [], policiesMe
   }, []);
 
   // Core nav items — always displayed. URLs come from Shopify when available,
-  // otherwise fall back to hardcoded defaults.
+  // otherwise fall back to hardcoded defaults. Wrapped in absolutifyStorefront()
+  // so relative paths from Shopify (e.g. "Home" → "/") resolve to the main
+  // storefront when this framework runs on a subdomain.
   const shopifyUrl = (title: string, fallback: string) =>
-    mainMenu.find((i) => i.title === title)?.url ?? fallback;
+    absolutifyStorefront(mainMenu.find((i) => i.title === title)?.url ?? fallback);
 
   const coreNavLinks = [
     { id: "home",    title: "Home",                 url: shopifyUrl("Home",                 "/") },
     { id: "about",   title: "About Us",             url: shopifyUrl("About Us",             "https://celsiusherbs.myshopify.com/pages/about-us") },
     { id: "contact", title: "Contact Us",           url: shopifyUrl("Contact Us",           "https://celsiusherbs.myshopify.com/pages/contact-us") },
-    { id: "blog",    title: "Blog",                 url: shopifyUrl("Blog",                 "/blog/folliculitis-guide") },
+    { id: "blog",    title: "Blog",                 url: shopifyUrl("Blog",                 "https://celsiusherbs.com/blogs/news") },
     { id: "sale",    title: "Shop Now And Save Big", url: shopifyUrl("Shop Now And Save Big", "https://celsiusherbs.myshopify.com/collections") },
   ];
 
@@ -150,8 +165,8 @@ export default function SiteHeader({ mainMenu = [], shopAllMenu = [], policiesMe
       {/* ------------------------------------------------------------------ */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-10 h-16 sm:h-18 lg:h-[84px] flex items-center justify-between gap-4">
-          {/* Logo */}
-          <a href="/" className="flex-shrink-0">
+          {/* Logo — points to the main storefront, not the current subdomain. */}
+          <a href={STOREFRONT_BASE} className="flex-shrink-0">
             <img src="/Logo/Logo.avif" alt="Celsius Organic Herbs" className="h-10 w-auto sm:h-12 lg:h-16" />
           </a>
 
@@ -165,7 +180,7 @@ export default function SiteHeader({ mainMenu = [], shopAllMenu = [], policiesMe
             {/* Shop All dropdown */}
             <NavDropdown
               label="Shop All"
-              href={shopifyUrl("Shop All", "/shopify-collections")}
+              href={shopifyUrl("Shop All", "https://celsiusherbs.com/collections/all")}
               items={resolvedShopAll}
             />
 
@@ -244,7 +259,7 @@ export default function SiteHeader({ mainMenu = [], shopAllMenu = [], policiesMe
                     {resolvedShopAll.map((item) => (
                       <a
                         key={item.id}
-                        href={item.url}
+                        href={absolutifyStorefront(item.url)}
                         onClick={closeMobile}
                         className="nav-link-blue py-2 text-sm"
                       >
@@ -281,7 +296,7 @@ export default function SiteHeader({ mainMenu = [], shopAllMenu = [], policiesMe
                     {resolvedPolicies.map((item) => (
                       <a
                         key={item.id}
-                        href={item.url}
+                        href={absolutifyStorefront(item.url)}
                         onClick={closeMobile}
                         className="nav-link-blue py-2 text-sm"
                       >

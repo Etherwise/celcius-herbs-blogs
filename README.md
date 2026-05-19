@@ -4,9 +4,11 @@
 
 Headless front-end for **celsiusherbs.com**. The blog lives at `blog.celsiusherbs.com` and product detail pages live in this same framework, fed by the Shopify Storefront API for shared header/footer/cart state. The main `celsiusherbs.com` Shopify storefront is unchanged.
 
+> **👋 First time here?** Start with **[`QUICKSTART.md`](./QUICKSTART.md)** — it's written for non-technical team members and gets you from zero to a running local preview in 10 minutes. Come back here when you want the technical details.
+
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (technical reference)
 
 ```bash
 # 1. Install dependencies (npm — bun.lock is included as backup but npm is canonical)
