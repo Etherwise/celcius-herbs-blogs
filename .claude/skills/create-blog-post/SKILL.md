@@ -244,12 +244,127 @@ python3 -c "import json; json.load(open('/tmp/celsius-skill/$SLUG/research.json'
 
 ## Stage 2 — Content Research (OpenRouter → Perplexity)
 
-**[STUB — implemented in Task 2.3]**
+### 2.1 — Read research.json
 
-Read `research.json`, call OpenRouter's chat-completions endpoint with `perplexity/sonar-pro` model. Save sourced research to `/tmp/celsius-skill/$SLUG/perplexity-research.md`.
+```bash
+RESEARCH_PATH="/tmp/celsius-skill/$SLUG/research.json"
 
+USER_TOPIC=$(python3 -c "import json; print(json.load(open('$RESEARCH_PATH'))['user_topic'])")
+PRIMARY=$(python3 -c "import json; print(json.load(open('$RESEARCH_PATH'))['primary_keyword'])")
+SECONDARY=$(python3 -c "import json; print(', '.join(json.load(open('$RESEARCH_PATH'))['secondary_keywords']))")
 ```
-✓ Stage 2 complete (STUB)
+
+### 2.2 — Load the prompt template
+
+Read `.claude/skills/create-blog-post/reference/research-prompts.md`. Extract the **system prompt** (the first code block under `## System prompt`) and the **user prompt template** (the code block under `## User prompt`).
+
+In the user prompt, substitute:
+- `<USER_TOPIC>` → `$USER_TOPIC`
+- `<PRIMARY_KEYWORD>` → `$PRIMARY`
+- `<SECONDARY_KEYWORDS>` → `$SECONDARY`
+
+### 2.3 — Build the API request
+
+```bash
+WORK_DIR="/tmp/celsius-skill/$SLUG"
+
+# Build the JSON request body using python (avoid shell-quoting hell with multi-line strings)
+python3 <<PY > "$WORK_DIR/request.json"
+import json, os
+system_prompt = """<paste system prompt content here>"""
+user_prompt = """<paste filled user prompt here>"""
+body = {
+    "model": "perplexity/sonar-pro",
+    "messages": [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": user_prompt},
+    ],
+    "max_tokens": 4000,
+    "temperature": 0.3,
+}
+print(json.dumps(body))
+PY
+```
+
+(Claude executes this — substitutes the actual prompt strings into the python heredoc at run-time.)
+
+### 2.4 — Call OpenRouter
+
+```bash
+curl -sS -X POST "https://openrouter.ai/api/v1/chat/completions" \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "HTTP-Referer: https://blog.celsiusherbs.com" \
+  -H "X-Title: Celsius Herbs Blog Skill" \
+  -d @"$WORK_DIR/request.json" \
+  > "$WORK_DIR/perplexity-raw.json"
+```
+
+The `HTTP-Referer` and `X-Title` headers are OpenRouter convention — they show up in OpenRouter's dashboard so Rick can see which app is making calls.
+
+### 2.5 — Extract content + handle errors
+
+```bash
+python3 <<PY
+import json, sys
+
+raw = json.load(open("$WORK_DIR/perplexity-raw.json"))
+
+if "error" in raw:
+    print(f"❌ OpenRouter error: {raw['error']}", file=sys.stderr)
+    sys.exit(1)
+
+if "choices" not in raw or not raw["choices"]:
+    print(f"❌ Unexpected response shape: {json.dumps(raw)[:400]}", file=sys.stderr)
+    sys.exit(1)
+
+content = raw["choices"][0]["message"]["content"]
+
+with open("$WORK_DIR/perplexity-research.md", "w") as f:
+    f.write(content)
+
+# Quick quality probe
+words = len(content.split())
+citations = content.count("[Source:")
+print(f"✓ Wrote {words} words, {citations} citations to perplexity-research.md")
+
+if words < 500:
+    print(f"⚠️ Research is short ({words} words). Consider re-running Stage 2.", file=sys.stderr)
+if citations < 3:
+    print(f"⚠️ Few citations ({citations}). Quality may be weak.", file=sys.stderr)
+PY
+```
+
+### 2.6 — On API failure
+
+If `curl` fails (non-2xx) or extraction reports error:
+- Wait 5 seconds
+- Retry once
+- If retry fails, STOP and report to user. Don't proceed to Stage 3 without research notes.
+
+Common failure modes:
+- `401` → bad API key. Check `$OPENROUTER_API_KEY`.
+- `429` → rate limit. Wait + retry, OR ask user to wait a few minutes.
+- `5xx` → OpenRouter side. Wait + retry, then fail.
+
+### 2.7 — Update metadata + report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 2
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+echo "
+✓ Stage 2 complete
+
+  Sources from:  OpenRouter → perplexity/sonar-pro
+  Output:        /tmp/celsius-skill/$SLUG/perplexity-research.md
+  Words:         <from extraction>
+  Citations:     <from extraction>
+"
 ```
 
 ---
