@@ -564,25 +564,399 @@ echo "
 
 ## Stage 5 — Image Generation (Gemini / NanoBanana)
 
-**[STUB — implemented in Task 4.2]**
+### 5.1 — Verify Pillow is available
 
-Parse image tags from `draft-optimized.md`. For each, call Gemini's `gemini-3.1-flash-image-preview` model with a style-guide-constrained prompt. Save each `.webp` directly to `src/assets/blog/<slug>-<name>.webp`.
+The skill converts Gemini's JPEG output to WebP using Python Pillow.
 
+```bash
+python3 -c "from PIL import Image" 2>/dev/null \
+  || { echo "❌ Pillow not installed. Run: python3 -m pip install Pillow"; exit 1; }
+echo "✓ Pillow available"
 ```
-✓ Stage 5 complete (STUB)
+
+### 5.2 — Parse image tags from the optimized draft
+
+```bash
+WORK_DIR="/tmp/celsius-skill/$SLUG"
+DRAFT_OPT="$WORK_DIR/draft-optimized.md"
+
+python3 <<PY > "$WORK_DIR/image-tags.json"
+import re, json
+content = open("$DRAFT_OPT").read()
+tags = re.findall(r'\[IMAGE:\s*([a-z0-9-]+)\s*\|\s*(.+?)\]', content, re.IGNORECASE)
+out = [{"name": name.strip(), "prompt_seed": prompt.strip()} for name, prompt in tags]
+print(json.dumps(out, indent=2))
+PY
+
+EXPECTED_COUNT=$(python3 -c "import json; print(len(json.load(open('$WORK_DIR/image-tags.json'))))")
+echo "Found $EXPECTED_COUNT image tags in optimized draft"
+
+if [ "$EXPECTED_COUNT" -lt 3 ]; then
+  echo "❌ Too few image tags ($EXPECTED_COUNT). Expected 5 from the original draft."
+  exit 1
+fi
+```
+
+### 5.3 — Load the style guide
+
+```bash
+STYLE_GUIDE=$(cat .claude/skills/create-blog-post/reference/image-style-guide.md)
+```
+
+### 5.4 — Generate each image
+
+For each entry in `image-tags.json`, build a Gemini prompt and call the API. Use Python (cleaner JSON handling + base64 decode + WebP convert in one block).
+
+```bash
+python3 <<PY
+import json, os, base64, io, urllib.request, urllib.error
+from PIL import Image
+
+SLUG = "$SLUG"
+WORK_DIR = "$WORK_DIR"
+GEMINI_KEY = os.environ["GEMINI_API_KEY"]
+STYLE_GUIDE = """$STYLE_GUIDE"""  # Note: shell var expansion happens before python parses
+
+# Concise style instructions for the prompt (full guide is too long for every API call)
+STYLE_INSTRUCTION = """
+Photography style: 35mm film camera (Leica M6 or Pentax 67), 50-85mm prime lens, f/2.0-2.8, shallow DOF, natural window light or golden hour (never flash). Warm color palette: peach cream (#F4E4D1), ink-deep brown (#3A2F26), muted ochre (#B89B6A), dusty sage (#A6B59A). Editorial-magazine composition with negative space. Apothecary-meets-veterinary aesthetic: herbal wellness for pets, calm and considered, never cartoonish or stocky. The pet is the patient, not the product. Soft natural grain. Avoid: bright synthetic colors, neon, primary red, flash, AI-generated digital sharpness, text overlay, watermarks.
+""".strip()
+
+tags = json.load(open(f"{WORK_DIR}/image-tags.json"))
+out_dir = "src/assets/blog"
+os.makedirs(out_dir, exist_ok=True)
+
+generated = []
+for i, tag in enumerate(tags, 1):
+    name = tag["name"]
+    seed = tag["prompt_seed"]
+    full_prompt = f"{STYLE_INSTRUCTION}\n\nSubject: {seed}"
+
+    print(f"[{i}/{len(tags)}] Generating '{name}' ...", flush=True)
+
+    body = {
+        "contents": [{"parts": [{"text": full_prompt}]}],
+    }
+
+    req = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key={GEMINI_KEY}",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=90)
+        data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode(errors='ignore')
+        print(f"  ❌ HTTP {e.code}: {err_body[:300]}")
+        continue
+
+    if "error" in data:
+        print(f"  ❌ API error: {data['error']}")
+        continue
+
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    img_parts = [p for p in parts if "inlineData" in p or "inline_data" in p]
+
+    if not img_parts:
+        print(f"  ❌ No image in response (text-only)")
+        continue
+
+    inline = img_parts[0].get("inlineData") or img_parts[0].get("inline_data")
+    raw_bytes = base64.b64decode(inline["data"])
+
+    # Convert JPEG -> WebP @ quality 80
+    img = Image.open(io.BytesIO(raw_bytes))
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    webp_path = f"{out_dir}/{SLUG}-{name}.webp"
+    img.save(webp_path, format="WEBP", quality=80, method=6)
+
+    size_kb = os.path.getsize(webp_path) // 1024
+    print(f"  ✓ Saved {webp_path} ({size_kb} KB)")
+    generated.append(webp_path)
+
+print(f"\nGenerated {len(generated)}/{len(tags)} images")
+if len(generated) != len(tags):
+    print("⚠️  Some images failed to generate. You may want to re-run Stage 5 for the missing ones.")
+PY
+```
+
+### 5.5 — Verify all expected images exist
+
+```bash
+EXPECTED=$(python3 -c "import json; print(len(json.load(open('$WORK_DIR/image-tags.json'))))")
+ACTUAL=$(ls src/assets/blog/${SLUG}-*.webp 2>/dev/null | wc -l | tr -d ' ')
+
+echo "Expected: $EXPECTED images"
+echo "Actual:   $ACTUAL images"
+
+if [ "$EXPECTED" -ne "$ACTUAL" ]; then
+  echo "❌ Image count mismatch. Stage 6 will fail without all images."
+  echo "    Either regenerate the missing ones or remove the failed tags from draft-optimized.md."
+  exit 1
+fi
+```
+
+### 5.6 — Regeneration support
+
+If the user requests "regenerate the hero image" (or any specific name), re-run the loop above for ONLY that tag. Don't re-generate the ones already done.
+
+### 5.7 — Update metadata + report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 5
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+echo "
+✓ Stage 5 complete
+
+  Images generated: $ACTUAL
+  Saved to:         src/assets/blog/${SLUG}-*.webp
+
+  Review them before Stage 6 — open the files locally to spot-check brand consistency.
+  Say 'regenerate <name>' if any image needs a re-roll.
+"
 ```
 
 ---
 
 ## Stage 6 — Scaffold Framework Files
 
-**[STUB — implemented in Task 4.3]**
+**Template-driven** — read the cat-ear-infection files as live templates, substitute new content, write 4 new files. NEVER generate from scratch.
 
-Read cat-ear-infection files as live templates. Generate 4 new files (page, view, island, faqs) with new content. Apply 8 hard guarantees (slug consistency, build validation, etc.).
+### 6.1 — Compute names
 
+```bash
+WORK_DIR="/tmp/celsius-skill/$SLUG"
+
+# PascalCase component name + "Guide" suffix
+COMPONENT_NAME=$(echo "$SLUG" | python3 -c "
+import sys
+s = sys.stdin.read().strip()
+print(''.join(w.capitalize() for w in s.split('-')) + 'Guide')
+")
+
+# SCREAMING_SNAKE constant for FAQs
+FAQS_CONSTANT=$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_FAQS
+
+# Pascal core for builder function names (without "Guide")
+PASCAL_CORE=$(echo "$SLUG" | python3 -c "
+import sys
+s = sys.stdin.read().strip()
+print(''.join(w.capitalize() for w in s.split('-')))
+")
+
+echo "Slug:           $SLUG"
+echo "ComponentName:  $COMPONENT_NAME"
+echo "FAQs constant:  $FAQS_CONSTANT"
+echo "Pascal core:    $PASCAL_CORE"
 ```
-✓ Stage 6 complete (STUB)
+
+### 6.2 — Read templates + draft
+
+Use Read tool on:
+- `src/pages/cat-ear-infection.astro` (template for the new page)
+- `src/views/blog/CatEarInfectionGuide.tsx` (template for the view)
+- `src/islands/blog/CatEarInfectionGuide.tsx` (template for the island)
+- `src/lib/blog/cat-ear-infection-faqs.ts` (template for FAQs)
+- `$WORK_DIR/draft-optimized.md` (the new content)
+
+### 6.3 — Generate the 4 files
+
+For each file, do a careful template substitution. Apply across all 4:
+- `cat-ear-infection` → `$SLUG` (in all file paths, URLs, import paths, slug references)
+- `CatEarInfection` → `$PASCAL_CORE` (in component / function / class names)
+- `CatEarInfectionGuide` → `$COMPONENT_NAME` (in component imports + exports)
+- `CAT_EAR_INFECTION_FAQS` → `$FAQS_CONSTANT`
+- `buildCatEarInfection*` → `build${PASCAL_CORE}*` (JSON-LD builder functions)
+- Frontmatter values (title, description, canonical, ogImage) → from the draft's YAML frontmatter
+- Body content of the view → translated from the draft markdown (sections, FAQs, references, CTA)
+- Image imports in the view → `<slug>-{hero,...}.webp` matching what Stage 5 produced
+
+**Page route** (`src/pages/<slug>.astro`):
+- Same import structure as cat-ear-infection.astro
+- `<Layout>` props from frontmatter values
+- `jsonLd` from `build*JsonLd` functions imported from the new faqs.ts
+
+**View** (`src/views/blog/<ComponentName>.tsx`):
+- Same component structure as CatEarInfectionGuide.tsx
+- Hero, TOC, body sections, FAQs (rendered from FAQs constant), references, CTA
+- All `[IMAGE: <name> | ...]` placeholders → real `<img src={importedImage}>` JSX
+- **Pet articles**: add `import { ReviewedByDrAlex } from "@/components/blog/ReviewedByDrAlex";` and render `<ReviewedByDrAlex />` near the bottom (just before the Final CTA section)
+
+**Island** (`src/islands/blog/<ComponentName>.tsx`):
+- 5-line wrapper. Just imports the view and re-exports.
+
+**FAQs** (`src/lib/blog/<slug>-faqs.ts`):
+- Export `<FAQS_CONSTANT>` array of `{q, a}` objects from the FAQ section of the draft
+- Export `build${PASCAL_CORE}FaqJsonLd(faqs?)` function (FAQPage schema)
+- Export `build${PASCAL_CORE}ArticleJsonLd()` function (Article schema with @id = canonical URL)
+
+### 6.4 — Hard guarantees (ALL must pass — fix-and-retry on failure)
+
+#### Check A — Slug consistency
+
+```bash
+for f in \
+  "src/pages/$SLUG.astro" \
+  "src/views/blog/$COMPONENT_NAME.tsx" \
+  "src/islands/blog/$COMPONENT_NAME.tsx" \
+  "src/lib/blog/$SLUG-faqs.ts"
+do
+  if [ ! -f "$f" ]; then
+    echo "❌ Missing file: $f"
+    exit 1
+  fi
+  if ! grep -q "$SLUG" "$f"; then
+    echo "❌ $f does not reference slug '$SLUG'"
+    exit 1
+  fi
+done
+echo "✓ A. slug consistency"
 ```
+
+#### Check B — Image imports ↔ files parity
+
+```bash
+IMG_IMPORTS=$(grep -cE "from \"@/assets/blog/${SLUG}-" "src/views/blog/$COMPONENT_NAME.tsx")
+IMG_FILES=$(ls "src/assets/blog/${SLUG}-"*.webp 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$IMG_IMPORTS" -ne "$IMG_FILES" ]; then
+  echo "❌ View imports $IMG_IMPORTS images but $IMG_FILES files exist on disk"
+  echo "    Missing files would break the build. Either:"
+  echo "    - Remove unused imports from the view"
+  echo "    - Re-run Stage 5 to generate the missing images"
+  exit 1
+fi
+echo "✓ B. image imports match files ($IMG_FILES each)"
+```
+
+#### Check C — Case-sensitivity guard
+
+```bash
+if [ "$(git config core.ignorecase)" != "false" ]; then
+  echo "⚠️ core.ignorecase is not false — setting it now to catch case bugs early"
+  git config core.ignorecase false
+fi
+echo "✓ C. case sensitivity"
+```
+
+#### Check D — JSON-LD wiring
+
+```bash
+EXPORTS=$(grep -oE "export function build[A-Za-z]+JsonLd" "src/lib/blog/$SLUG-faqs.ts" | sed 's/^export function //' | sort -u)
+IMPORTS=$(grep -oE "build[A-Za-z]+JsonLd" "src/pages/$SLUG.astro" | sort -u)
+
+if [ "$EXPORTS" != "$IMPORTS" ]; then
+  echo "❌ JSON-LD function names mismatch between page and faqs.ts"
+  echo "    faqs.ts exports:"
+  echo "$EXPORTS" | sed 's/^/      /'
+  echo "    page.astro imports:"
+  echo "$IMPORTS" | sed 's/^/      /'
+  exit 1
+fi
+echo "✓ D. JSON-LD wiring matches"
+```
+
+#### Check E — Pet article check
+
+```bash
+IS_PET=$(python3 -c "import json; print(json.load(open('$WORK_DIR/research.json'))['is_pet_article'])")
+
+if [ "$IS_PET" = "True" ] || [ "$IS_PET" = "true" ]; then
+  if ! grep -q "ReviewedByDrAlex" "src/views/blog/$COMPONENT_NAME.tsx"; then
+    echo "❌ Pet article missing <ReviewedByDrAlex /> block in view"
+    exit 1
+  fi
+  echo "✓ E. pet-article reviewer block present"
+else
+  echo "✓ E. non-pet article (no reviewer block needed)"
+fi
+```
+
+#### Check F — Canonical matches @id
+
+```bash
+CANONICAL=$(grep -oE 'canonical="[^"]+"' "src/pages/$SLUG.astro" | head -1 | sed 's/^canonical="//; s/"$//')
+ID_REF=$(grep -oE '"@id": *"[^"]+"' "src/lib/blog/$SLUG-faqs.ts" | head -1 | sed 's/^"@id": *"//; s/"$//')
+
+if [ "$CANONICAL" != "$ID_REF" ]; then
+  echo "❌ canonical ($CANONICAL) and JSON-LD @id ($ID_REF) don't match"
+  exit 1
+fi
+echo "✓ F. canonical = @id ($CANONICAL)"
+```
+
+#### Check G — Build validation (the big one)
+
+```bash
+echo "Running 'npm run build' to validate end-to-end ..."
+rm -rf dist .astro
+npm run build 2>&1 | tee "$WORK_DIR/build.log"
+BUILD_EXIT=${PIPESTATUS[0]}
+
+if [ "$BUILD_EXIT" -ne 0 ]; then
+  echo "❌ Build failed. See $WORK_DIR/build.log"
+  echo "    Read the error, fix the generated files, re-run this check."
+  exit 1
+fi
+echo "✓ G. npm run build passes"
+```
+
+#### Check H — Type/lint pass (already covered by build, but double-check)
+
+```bash
+# Astro's build includes type-checking. If build passes, types are OK.
+# This step just confirms the new files actually loaded into the bundle.
+if ! grep -q "$COMPONENT_NAME" "$WORK_DIR/build.log"; then
+  echo "⚠️ Build log doesn't reference $COMPONENT_NAME — page may not be in the route table"
+fi
+echo "✓ H. components loaded in build"
+```
+
+### 6.5 — Update metadata + report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 6
+m['files'] = [
+  'src/pages/$SLUG.astro',
+  'src/views/blog/$COMPONENT_NAME.tsx',
+  'src/islands/blog/$COMPONENT_NAME.tsx',
+  'src/lib/blog/$SLUG-faqs.ts',
+]
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+echo "
+✓ Stage 6 complete
+
+  Files written:
+    - src/pages/$SLUG.astro
+    - src/views/blog/$COMPONENT_NAME.tsx
+    - src/islands/blog/$COMPONENT_NAME.tsx
+    - src/lib/blog/$SLUG-faqs.ts
+  Images:     $IMG_FILES at src/assets/blog/${SLUG}-*.webp
+  Build:      PASS
+  All 8 hard guarantees: PASS
+"
+```
+
+### What Stage 6 explicitly does NOT do
+
+- Does NOT modify any existing file (only creates new ones)
+- Does NOT touch `astro.config.mjs`, `package.json`, `tsconfig.json`, or any framework config
+- Does NOT change the cat-ear-infection files (they remain the canonical template)
+- Does NOT alter the `<ReviewedByDrAlex />` component (only references it)
+- Does NOT commit or push (that's Stage 7's job)
 
 ---
 
