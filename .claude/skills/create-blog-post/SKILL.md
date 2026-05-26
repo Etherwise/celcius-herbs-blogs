@@ -371,24 +371,193 @@ echo "
 
 ## Stage 3 — Draft Article
 
-**[STUB — implemented in Task 3.2]**
+This stage uses Claude (the runtime) as the writer. No external API.
 
-Claude writes the article in markdown using the research as input + `reference/article-structure.md` as the EEAT template. Saves to `/tmp/celsius-skill/$SLUG/draft.md`.
+### 3.1 — Read all inputs
 
+```bash
+WORK_DIR="/tmp/celsius-skill/$SLUG"
 ```
-✓ Stage 3 complete (STUB)
+
+Use the Read tool to load:
+- `$WORK_DIR/research.json` — keyword data + word-count target + is_pet_article flag
+- `$WORK_DIR/perplexity-research.md` — sourced facts to weave in
+- `.claude/skills/create-blog-post/reference/article-structure.md` — the structure rules
+
+Also read the existing cat-ear post for tone reference:
+- `src/views/blog/CatEarInfectionGuide.tsx` — same voice + structure target
+
+### 3.2 — Write the article
+
+Draft the full article in markdown directly to `$WORK_DIR/draft.md` using the Write tool. Apply ALL rules from `reference/article-structure.md`:
+
+**Must contain:**
+- A YAML frontmatter block (title, description, canonical, ogType, ogImage, is_pet_article, primary_keyword)
+- Hero intro (2–3 paragraphs, direct answer within first 100 words, primary keyword in first 100 words)
+- Table of contents (static, bulleted list of H2s)
+- 5–8 body H2 sections (`## Chapter NN — Title` format)
+- Exactly 5 `[IMAGE: <name> | <prompt>]` placeholders distributed across the article
+- FAQ section with 5–8 `**Q:** ... A: ...` pairs
+- References section with numbered citations from the Perplexity research
+- A "Final CTA" section linking to `/ear-infection-drops` (or another appropriate PDP)
+
+**Keyword placement (verify before finishing):**
+- Primary keyword in: title, description, first 100 words, ≥2 H2s, ≥1 FAQ
+- Secondary keywords distributed naturally
+- Inline `[Source: ...]` citations every 2–3 paragraphs
+
+**Word count:** Match `recommended_word_count` from `research.json` (±15%). Default 2000.
+
+**Voice:** Match the cat-ear post — direct, plainspoken, empathy-led, no AI-isms.
+
+### 3.3 — Validate the draft
+
+```bash
+DRAFT="$WORK_DIR/draft.md"
+
+WORDS=$(wc -w < "$DRAFT")
+H2_COUNT=$(grep -c "^## " "$DRAFT")
+IMG_COUNT=$(grep -c "^\[IMAGE:" "$DRAFT")
+FAQ_COUNT=$(grep -c "^\*\*Q:" "$DRAFT")
+CITATION_COUNT=$(grep -oc "\[Source:" "$DRAFT")
+
+# Pull frontmatter values
+TITLE=$(grep '^title:' "$DRAFT" | head -1 | sed 's/^title: *//; s/^"//; s/"$//')
+DESC=$(grep '^description:' "$DRAFT" | head -1 | sed 's/^description: *//; s/^"//; s/"$//')
+
+echo "Words:        $WORDS  (target from research.json)"
+echo "H2 sections:  $H2_COUNT  (target 5-8 + TOC + FAQ + References + Final CTA = ~8-11 total ##)"
+echo "Image tags:   $IMG_COUNT  (REQUIRED: exactly 5)"
+echo "FAQs:         $FAQ_COUNT  (target 5-8)"
+echo "Citations:    $CITATION_COUNT"
+echo "Title len:    ${#TITLE} chars (limit 60)"
+echo "Desc len:     ${#DESC} chars (limit 155)"
+
+# Hard fails
+[ "$IMG_COUNT" -ne 5 ] && { echo "❌ Expected exactly 5 [IMAGE:] tags, got $IMG_COUNT. Re-draft."; exit 1; }
+[ "$FAQ_COUNT" -lt 5 ] && { echo "❌ Need at least 5 FAQs, got $FAQ_COUNT."; exit 1; }
+[ ${#TITLE} -gt 60 ] && { echo "❌ Title too long: ${#TITLE} chars (>60)."; exit 1; }
+[ ${#DESC} -gt 155 ] && { echo "❌ Description too long: ${#DESC} chars (>155)."; exit 1; }
+[ "$WORDS" -lt 1200 ] && { echo "❌ Draft too short: $WORDS words (<1200)."; exit 1; }
+
+echo "✓ Draft validation passed"
+```
+
+If any hard fail triggers, re-draft (don't move to Stage 4). If a non-fatal warning surfaces (e.g. citation count low), Claude can re-draft or move on at the user's discretion.
+
+### 3.4 — Update metadata + report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 3
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+echo "
+✓ Stage 3 complete
+
+  Title:        <title>
+  Words:        <words>
+  Sections:     <h2 count>
+  FAQs:         <faq count>
+  Image tags:   <img count> (must be 5)
+  Citations:    <citation count>
+  Output:       /tmp/celsius-skill/$SLUG/draft.md
+"
 ```
 
 ---
 
 ## Stage 4 — PAUSE for SurferSEO
 
-**[STUB — implemented in Task 3.4]**
+This is a **manual checkpoint**. The skill stops execution and waits for the user.
 
-Skill stops, outputs draft path, instructs user to run through Surfer manually, paste optimized version back. Saves to `/tmp/celsius-skill/$SLUG/draft-optimized.md`.
+### 4.1 — Output instructions to the user
 
 ```
-✓ Stage 4 complete (STUB)
+─────────────────────────────────────────────────────────────────────
+SURFERSEO STEP — MANUAL
+
+The draft is ready at:
+  /tmp/celsius-skill/<SLUG>/draft.md
+
+Steps:
+  1. Open SurferSEO Content Editor: https://app.surferseo.com
+  2. Create a new Content Editor query targeting: "<PRIMARY_KEYWORD>"
+  3. Open draft.md, copy its full contents (Cmd+A, Cmd+C)
+  4. Paste into Surfer's editor
+  5. Optimize until score ≥80:
+     - Apply Surfer's suggested terms where they fit naturally
+     - Hit the word-count target
+     - Don't sacrifice readability for score
+  6. When done, copy the optimized text
+  7. Paste it back into this conversation as your next message
+
+I'll wait for your paste.
+─────────────────────────────────────────────────────────────────────
+```
+
+### 4.2 — Wait for the user's paste
+
+Stop and wait. The user's next message should contain the optimized draft (likely a large markdown block).
+
+When it arrives, save the contents using the Write tool:
+- Path: `/tmp/celsius-skill/$SLUG/draft-optimized.md`
+- Content: the user's paste, verbatim
+
+### 4.3 — Quality probe on the pasted content
+
+```bash
+DRAFT_OPT="/tmp/celsius-skill/$SLUG/draft-optimized.md"
+
+OPT_WORDS=$(wc -w < "$DRAFT_OPT")
+OPT_IMG=$(grep -c "^\[IMAGE:" "$DRAFT_OPT")
+OPT_FAQ=$(grep -c "^\*\*Q:" "$DRAFT_OPT")
+
+# Compare to pre-Surfer draft
+ORIG_IMG=$(grep -c "^\[IMAGE:" "/tmp/celsius-skill/$SLUG/draft.md")
+ORIG_FAQ=$(grep -c "^\*\*Q:" "/tmp/celsius-skill/$SLUG/draft.md")
+
+echo "Optimized words: $OPT_WORDS"
+echo "Image tags:      $OPT_IMG  (was $ORIG_IMG)"
+echo "FAQs:            $OPT_FAQ  (was $ORIG_FAQ)"
+
+if [ "$OPT_WORDS" -lt 800 ]; then
+  echo "⚠️  Optimized draft seems short ($OPT_WORDS words). Did you paste the FULL optimized text?"
+  echo "    Confirm before we proceed."
+fi
+
+if [ "$OPT_IMG" -lt "$ORIG_IMG" ]; then
+  echo "⚠️  Image tags dropped from $ORIG_IMG → $OPT_IMG during Surfer edit."
+  echo "    Stage 5 will only generate images for the tags that remain."
+fi
+
+if [ "$OPT_FAQ" -lt 3 ]; then
+  echo "⚠️  Only $OPT_FAQ FAQs in optimized draft. FAQPage schema needs at least a few."
+fi
+```
+
+Warnings are non-fatal. The user confirms whether to proceed.
+
+### 4.4 — Update metadata + report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 4
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+echo "
+✓ Stage 4 complete
+
+  Optimized draft saved: /tmp/celsius-skill/$SLUG/draft-optimized.md
+  Words: $OPT_WORDS
+  Ready to proceed to Stage 5 (image generation)?
+"
 ```
 
 ---
