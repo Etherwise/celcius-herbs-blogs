@@ -102,15 +102,143 @@ Will happen in Stage 1 once we have the slug. Stage 0 just verifies keys + MCP.
 
 ---
 
-## Stage 1 — Keyword Research
+## Stage 1 — Keyword Research (Ahrefs MCP)
 
-**[STUB — implemented in Task 2.2]**
+### 1.1 — Get topic from the user
 
-Ask the user for the topic. Compute a slug. Call Ahrefs MCP. Write `research.json` to `/tmp/celsius-skill/$SLUG/`.
+If the user's initial prompt didn't include a clear topic, ask:
+
+> "What's the topic for the blog post? (e.g., 'dog acid reflux home remedy', 'cat ear mites'). Be specific — the more focused the topic, the better the keyword research."
+
+Capture as `USER_TOPIC`.
+
+### 1.2 — Compute the URL slug
+
+Derive `SLUG` from `USER_TOPIC`: lowercase, replace spaces with hyphens, strip punctuation, max 6 words.
+
+Examples:
+- `"Dog Acid Reflux Home Remedy"` → `dog-acid-reflux-home-remedy`
+- `"Cat Ear Mites"` → `cat-ear-mites`
+- `"How to Treat Probiotics for Dogs"` → `probiotics-for-dogs`
+
+### 1.3 — Detect if this is a pet article
+
+Set `IS_PET_ARTICLE=true` if `USER_TOPIC` contains any of: `dog`, `dogs`, `cat`, `cats`, `puppy`, `puppies`, `kitten`, `kittens`, `pet`, `pets`, `feline`, `canine`. Otherwise `false`. This controls whether `<ReviewedByDrAlex />` is included in Stage 6.
+
+### 1.4 — Set up the working directory
+
+```bash
+SLUG="<computed slug>"
+mkdir -p /tmp/celsius-skill/$SLUG/images
+cat > /tmp/celsius-skill/$SLUG/metadata.json <<EOF
+{
+  "slug": "$SLUG",
+  "topic": "<USER_TOPIC>",
+  "is_pet_article": <true|false>,
+  "started_at": "$(date -Iseconds)",
+  "current_stage": 1
+}
+EOF
+echo "✓ working dir ready: /tmp/celsius-skill/$SLUG/"
+```
+
+### 1.5 — Call Ahrefs MCP for keyword overview
+
+Call the tool `mcp__ahrefs__keywords-explorer-overview` with these inputs:
+- `keywords`: the user's topic, in an array. E.g. `["dog acid reflux home remedy"]`
+- `country`: `"us"`
+- `select`: `["volume", "difficulty", "cpc", "intent", "global_volume", "parent_topic"]` (or use defaults if these aren't directly supported — fall back to what the MCP returns)
+
+Parse the response and pull:
+- `primary_keyword`: the exact keyword from the response (may differ slightly from user input)
+- `search_volume`
+- `keyword_difficulty`
+- `parent_topic`
+- `search_intent` (informational / commercial / transactional / navigational)
+- `cpc` (optional, for prioritization)
+
+### 1.6 — Call Ahrefs MCP for related terms
+
+Call `mcp__ahrefs__keywords-explorer-matching-terms` with:
+- `keywords`: `[primary_keyword]`
+- `country`: `"us"`
+- `match_type`: `"terms"` (broader related-terms variant if available)
+- `limit`: `50`
+- `volume_from`: `100` (filter out near-zero-volume noise)
+- `difficulty_to`: `30` (favor easier targets)
+
+From the response:
+- Pick **5–10 secondary keywords** with the highest combined `volume / difficulty` ratio
+- Use a subset of these to suggest **5–8 H2 section topics** (e.g. cluster the secondaries into themes)
+
+### 1.7 — Determine word count target
+
+Based on parent topic & intent:
+- Informational + KD < 10: target 1500–2000 words
+- Informational + KD 10–30: target 2000–2500 words
+- Hub / commercial / KD > 30: target 3000+ words
+
+If unsure, default to **2000**.
+
+### 1.8 — Write `research.json`
+
+```bash
+cat > /tmp/celsius-skill/$SLUG/research.json <<JSON
+{
+  "user_topic": "<USER_TOPIC>",
+  "url_slug": "$SLUG",
+  "primary_keyword": "<from 1.5>",
+  "secondary_keywords": ["<kw1>", "<kw2>", "..."],
+  "search_volume": <number>,
+  "keyword_difficulty": <number>,
+  "parent_topic": "<from 1.5>",
+  "search_intent": "<from 1.5>",
+  "recommended_word_count": <from 1.7>,
+  "suggested_h2_topics": ["<topic1>", "<topic2>", "..."],
+  "is_pet_article": <true|false>
+}
+JSON
+```
+
+Validate it's well-formed JSON:
+
+```bash
+python3 -c "import json; json.load(open('/tmp/celsius-skill/$SLUG/research.json'))" \
+  && echo "✓ research.json well-formed" \
+  || { echo "❌ research.json malformed"; exit 1; }
+```
+
+### 1.9 — Report to user
 
 ```
-✓ Stage 1 complete (STUB)
+✓ Stage 1 complete
+
+  Topic:               <USER_TOPIC>
+  Slug:                <SLUG>
+  Primary keyword:     <primary_keyword>
+  Search volume:       <volume>/mo
+  KD:                  <difficulty>
+  Intent:              <intent>
+  Word count target:   <word_count>
+  Pet article?         <yes/no — affects Dr. Alex block in Stage 6>
+
+  Secondary keywords (top 5-10):
+    - <kw1>
+    - <kw2>
+    ...
+
+  Suggested H2 sections:
+    - <topic1>
+    - <topic2>
+    ...
+
+  Output: /tmp/celsius-skill/<slug>/research.json
 ```
+
+### Failure handling
+
+- **Ahrefs MCP timeout / quota exhausted** → stop and tell the user. Optionally let them provide keyword data manually as a fallback (`{"primary_keyword": "...", "search_volume": ..., ...}` pasted directly).
+- **Topic too broad** (no clear primary keyword) → ask the user to narrow it (e.g. `"dog health"` → `"dog acid reflux home remedy"`).
 
 ---
 
