@@ -25,6 +25,21 @@ The skill never auto-publishes. Stage 7 stops at a preview URL for human review 
 
 Every run uses `/tmp/celsius-skill/<topic-slug>/` to stage intermediate outputs. Failures leave a trail there for debugging.
 
+## Error handling (skill-wide)
+
+- Every stage exits non-zero on hard failures
+- Working files are preserved at `/tmp/celsius-skill/<slug>/` for inspection — never auto-cleaned
+- If a stage fails, the next run can resume by jumping to that stage (check `metadata.json` `current_stage`)
+- API errors (Perplexity / Gemini) get one automatic retry with 5s backoff before failing
+- Build failure at Stage 6 ALWAYS halts the pipeline — never deploy a non-building post
+
+## Cost expectations per run
+
+- Stage 1 Ahrefs: ~50-100 units against Rick's MCP quota
+- Stage 2 Perplexity (via OpenRouter): ~$0.01–0.05
+- Stage 5 Gemini (5 images): ~$0.10–0.20
+- **Total per blog post: ~$0.15–0.30**
+
 [Stage details below — each section is a step the skill must execute in order.]
 
 ---
