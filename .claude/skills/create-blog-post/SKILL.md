@@ -99,3 +99,96 @@ Will happen in Stage 1 once we have the slug. Stage 0 just verifies keys + MCP.
 ```
 ✓ Stage 0 complete
 ```
+
+---
+
+## Stage 1 — Keyword Research
+
+**[STUB — implemented in Task 2.2]**
+
+Ask the user for the topic. Compute a slug. Call Ahrefs MCP. Write `research.json` to `/tmp/celsius-skill/$SLUG/`.
+
+```
+✓ Stage 1 complete (STUB)
+```
+
+---
+
+## Stage 2 — Content Research (OpenRouter → Perplexity)
+
+**[STUB — implemented in Task 2.3]**
+
+Read `research.json`, call OpenRouter's chat-completions endpoint with `perplexity/sonar-pro` model. Save sourced research to `/tmp/celsius-skill/$SLUG/perplexity-research.md`.
+
+```
+✓ Stage 2 complete (STUB)
+```
+
+---
+
+## Stage 3 — Draft Article
+
+**[STUB — implemented in Task 3.2]**
+
+Claude writes the article in markdown using the research as input + `reference/article-structure.md` as the EEAT template. Saves to `/tmp/celsius-skill/$SLUG/draft.md`.
+
+```
+✓ Stage 3 complete (STUB)
+```
+
+---
+
+## Stage 4 — PAUSE for SurferSEO
+
+**[STUB — implemented in Task 3.4]**
+
+Skill stops, outputs draft path, instructs user to run through Surfer manually, paste optimized version back. Saves to `/tmp/celsius-skill/$SLUG/draft-optimized.md`.
+
+```
+✓ Stage 4 complete (STUB)
+```
+
+---
+
+## Stage 5 — Image Generation (Gemini / NanoBanana)
+
+**[STUB — implemented in Task 4.2]**
+
+Parse image tags from `draft-optimized.md`. For each, call Gemini's `gemini-3.1-flash-image-preview` model with a style-guide-constrained prompt. Save each `.webp` directly to `src/assets/blog/<slug>-<name>.webp`.
+
+```
+✓ Stage 5 complete (STUB)
+```
+
+---
+
+## Stage 6 — Scaffold Framework Files
+
+**[STUB — implemented in Task 4.3]**
+
+Read cat-ear-infection files as live templates. Generate 4 new files (page, view, island, faqs) with new content. Apply 8 hard guarantees (slug consistency, build validation, etc.).
+
+```
+✓ Stage 6 complete (STUB)
+```
+
+---
+
+## Stage 7 — Deploy Preview URL
+
+**[STUB — implemented in Task 5.2]**
+
+Create `preview/<slug>` branch, commit generated files, push. GitHub Actions deploys to Cloudflare preview. Skill outputs URL and STOPS.
+
+```
+✓ Stage 7 complete (STUB)
+PREVIEW URL: <url>
+```
+
+---
+
+## End
+
+The skill exits here. The user (or Dr. Alex) reviews the preview URL. If approved, they merge the `preview/<slug>` branch to main → existing main workflow ships it to production.
+
+The skill never auto-publishes.
