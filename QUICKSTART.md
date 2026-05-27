@@ -152,3 +152,58 @@ Everything else (config files, helpers, etc.) — **don't touch.** If you think 
 4. When you're comfortable, write your first real post and push to GitHub
 
 That's it. Welcome to the tool.
+
+---
+
+## Setting up the AI blog skill (recommended workflow)
+
+The framework includes a **Claude Code skill** that automates the whole blog creation pipeline. Open this folder in Claude Code, then say something like:
+
+> "Use create-blog-post to write a post about cat ear mites"
+
+…and the skill runs through 7 stages: keyword research → content research → drafting → SurferSEO pause → image generation → file scaffolding → preview deploy. The only thing you do by hand is the Surfer optimization step.
+
+### One-time setup (5 minutes)
+
+You need 2 API keys (Ahrefs is already configured from the existing setup).
+
+**1. OpenRouter API key** — content research
+- Sign up: https://openrouter.ai/keys
+- Pay-as-you-go, ~$0.01–0.05 per blog post
+- The skill calls `perplexity/sonar-pro` through OpenRouter
+
+**2. Gemini API key** — image generation
+- Get one: https://aistudio.google.com/apikey
+- Pay-as-you-go, ~$0.10–0.20 per blog post (5 images)
+- The skill uses `gemini-3.1-flash-image-preview` (a.k.a. NanoBanana)
+
+**3. Add them to `.env`** (next to the existing Shopify keys):
+```
+OPENROUTER_API_KEY=sk-or-v1-...
+GEMINI_API_KEY=AIza...
+```
+
+**4. Install Pillow** (Python library — used for JPEG→WebP conversion in Stage 5):
+```bash
+python3 -m pip install Pillow
+```
+
+That's it. Restart Claude Code if it was open, then trigger the skill.
+
+### How long does one post take?
+
+| Stage | Who | Time |
+|---|---|---|
+| Stages 1–3 (research + draft) | Skill | ~3–5 min |
+| Stage 4 (Surfer pass) | You | ~10–15 min |
+| Stages 5–7 (images + scaffold + preview deploy) | Skill | ~5–8 min |
+| **Total per post** | | **~25 minutes** |
+
+Compare to the ~13 hours the first cat-ear-infection post took manually.
+
+### When something goes wrong
+
+- The skill saves every intermediate output to `/tmp/celsius-skill/<your-slug>/` — research, draft, images, build logs. Inspect anything there.
+- Build failures at Stage 6 always halt the pipeline (the skill won't deploy a broken post).
+- If Stage 5 generates a weird image, just tell Claude *"regenerate the hero image"* — it'll re-roll only that one.
+- The preview branch (`preview/<slug>`) is throwaway. If you abandon a post, delete the branch on GitHub. Nothing's published until you merge to main.

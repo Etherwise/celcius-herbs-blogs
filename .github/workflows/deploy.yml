@@ -15,9 +15,11 @@
 name: Deploy to Cloudflare Pages
 
 on:
-  # Auto-deploy on every push to main
+  # Auto-deploy on every push to main (production) or to preview/* branches (preview).
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'preview/**'
   # Manual trigger from the Actions tab — useful for re-running without a code change
   workflow_dispatch:
 
@@ -57,11 +59,19 @@ jobs:
           PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN: ${{ secrets.PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN }}
         run: npm run build
 
+      - name: Compute Cloudflare branch name
+        id: cf_branch
+        run: |
+          # Cloudflare Pages branch slugs replace `/` with `-`.
+          # main → main (production); preview/cat-ear-mites → preview-cat-ear-mites (preview).
+          echo "name=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # `--branch=main` flags this as a production deploy (CF Pages convention)
-          command: pages deploy dist --project-name=deploy-celsius-herbs-dev --branch=main
+          # branch=main → production; anything else → preview deploy.
+          # Cloudflare auto-routes non-main deploys to a unique preview URL.
+          command: pages deploy dist --project-name=deploy-celsius-herbs-dev --branch=${{ steps.cf_branch.outputs.name }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
