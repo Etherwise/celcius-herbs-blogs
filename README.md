@@ -163,7 +163,8 @@ Large dist sizes (>50MB) over slow upload bandwidth can hit Cloudflare's 60s API
 
 ## 📚 Further Reading
 
-- `docs/ADDING-A-BLOG-POST.md` — the article-creation playbook
+- **`docs/AI-BLOG-SKILL.md` — how to use the AI blog skill** (start here for the automated pipeline)
+- `docs/ADDING-A-BLOG-POST.md` — the manual article-creation playbook (legacy / fallback)
 - `docs/FOLDER-STRUCTURE.md` — full annotated source tree
 - `docs/DEPLOYMENT.md` — CI/CD, secrets, manual deploy steps
 - [Astro 5 docs](https://docs.astro.build/)
