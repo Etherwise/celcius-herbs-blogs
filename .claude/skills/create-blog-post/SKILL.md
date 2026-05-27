@@ -815,13 +815,15 @@ For each file, do a careful template substitution. Apply across all 4:
 
 ### 6.4 — Hard guarantees (ALL must pass — fix-and-retry on failure)
 
-#### Check A — Slug consistency
+#### Check A — Slug + component-name consistency
+
+Three of the four files reference the kebab-case slug directly (URLs, route filenames, JSON-LD `@id`). The island file is a thin wrapper that only references the PascalCase component name — by design, mirroring the cat-ear-infection template. The check has to handle both.
 
 ```bash
+# Files where the kebab slug must appear (URL / route / canonical references)
 for f in \
   "src/pages/$SLUG.astro" \
   "src/views/blog/$COMPONENT_NAME.tsx" \
-  "src/islands/blog/$COMPONENT_NAME.tsx" \
   "src/lib/blog/$SLUG-faqs.ts"
 do
   if [ ! -f "$f" ]; then
@@ -833,7 +835,20 @@ do
     exit 1
   fi
 done
-echo "✓ A. slug consistency"
+
+# Island is a 5-line wrapper. It references the PascalCase component name only —
+# never the kebab slug. Verify the component name is present instead.
+ISLAND="src/islands/blog/$COMPONENT_NAME.tsx"
+if [ ! -f "$ISLAND" ]; then
+  echo "❌ Missing file: $ISLAND"
+  exit 1
+fi
+if ! grep -q "$COMPONENT_NAME" "$ISLAND"; then
+  echo "❌ $ISLAND does not reference component '$COMPONENT_NAME'"
+  exit 1
+fi
+
+echo "✓ A. slug consistency (3 files reference '$SLUG'; island references '$COMPONENT_NAME')"
 ```
 
 #### Check B — Image imports ↔ files parity
