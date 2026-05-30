@@ -1,0 +1,37 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CatEarMitesGuideIsland from "../islands/blog/CatEarMitesGuide";
+import {
+  buildCatEarMitesFaqJsonLd,
+  buildCatEarMitesArticleJsonLd,
+} from "../lib/blog/cat-ear-mites-faqs";
+
+// Primary keyword: "cat ear mites" (Ahrefs US — vol 13,000 / KD 21).
+// Title kept under 60 chars and includes primary kw in front.
+// Description hits under 155 chars and weaves in: what cat ear mites look like,
+// cat ear mites vs wax, cat ear mites treatment.
+//
+// Lives at the apex of the blog subdomain: blog.celsiusherbs.com/cat-ear-mites
+// (the subdomain implies "blog" so we don't repeat /blog/ in the path).
+//
+// Layout.astro accepts a single JSON-LD object — wrap Article + FAQPage in a
+// schema.org @graph so both schemas ship inside one <script type="application/ld+json">.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCatEarMitesArticleJsonLd(),
+    buildCatEarMitesFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Cat Ear Mites: Symptoms, Treatment & How to Spot Them"
+  description="Cat ear mites field guide — spot the coffee-ground debris, tell mites from wax, treat them safely, and know when your cat needs a vet."
+  canonical="https://blog.celsiusherbs.com/cat-ear-mites"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/cat-ear-mites.webp"
+  jsonLd={jsonLd}
+>
+  <CatEarMitesGuideIsland client:load />
+</Layout>
