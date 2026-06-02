@@ -1,6 +1,6 @@
 ---
 name: create-blog-post
-description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, image generation, file scaffolding, preview deploy, and automated SurferSEO scoring with revision loop. Fully hands-off when SURFER_API_KEY is configured; otherwise falls back to manual Surfer pause.
+description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, image generation, file scaffolding, preview deploy, and an automated SurferSEO audit + revision loop that iterates until the content score clears the threshold. Fully hands-off when SURFER_API_KEY is configured; when it is not set, the skill stops at the preview URL with no Surfer scoring.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, mcp__ahrefs__keywords-explorer-overview, mcp__ahrefs__keywords-explorer-matching-terms, mcp__ahrefs__subscription-info-limits-and-usage
 ---
 
@@ -14,13 +14,12 @@ Walks the user through an 8-stage pipeline that produces a fully-optimized, imag
 1. **Keyword research** — Ahrefs MCP
 2. **Content research** — OpenRouter → Perplexity (sonar-pro)
 3. **Draft article** — Claude writes the article (no external API)
-4. **SurferSEO** — automated when `SURFER_API_KEY` is set (see Stage 8); falls back to manual paste-and-resume when not set
-5. **Image generation** — 5 brand-consistent images via Gemini 3.1 Flash Image Preview (NanoBanana)
-6. **Scaffold framework files** — 4 files into the Astro framework + 8 hard guarantees
-7. **Deploy preview URL** — push `preview/<slug>` branch, output Cloudflare URL
-8. **Surfer audit + optional revision loop** — only runs when `SURFER_API_KEY` is configured. Audits the preview URL, reads the `content_score`, and if below threshold (default 70) asks Claude to revise the draft, re-deploys, and re-audits once. Outputs the final preview URL + score. STOP.
+4. **Image generation** — 5 brand-consistent images via Gemini 3.1 Flash Image Preview (NanoBanana)
+5. **Scaffold framework files** — 4 files into the Astro framework + 8 hard guarantees
+6. **Deploy preview URL** — push `preview/<slug>` branch, output Cloudflare URL
+7. **Surfer audit + revision loop** — only runs when `SURFER_API_KEY` is configured. Audits the preview URL, reads the `content_score`, and if below threshold (default 80) loops (revise → re-deploy → re-audit) up to 4 iterations or until guardrails fire. Outputs the final preview URL + score history. STOP.
 
-The skill never auto-publishes. Stages 7–8 always stop at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
+The skill never auto-publishes. Stages 6–7 always stop at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
 
 ## Working directory
 
@@ -32,14 +31,14 @@ Every run uses `/tmp/celsius-skill/<topic-slug>/` to stage intermediate outputs.
 - Working files are preserved at `/tmp/celsius-skill/<slug>/` for inspection — never auto-cleaned
 - If a stage fails, the next run can resume by jumping to that stage (check `metadata.json` `current_stage`)
 - API errors (Perplexity / Gemini) get one automatic retry with 5s backoff before failing
-- Build failure at Stage 6 ALWAYS halts the pipeline — never deploy a non-building post
+- Build failure at Stage 5 ALWAYS halts the pipeline — never deploy a non-building post
 
 ## Cost expectations per run
 
 - Stage 1 Ahrefs: ~50-100 units against the configured Ahrefs MCP quota
 - Stage 2 Perplexity (via OpenRouter): ~$0.01–0.05
-- Stage 5 Gemini (5 images): ~$0.10–0.20
-- Stage 8 SurferSEO audit: counts against the Surfer plan's API quota (~1–2 audit units per run; one additional if the revision loop fires)
+- Stage 4 Gemini (5 images): ~$0.10–0.20
+- Stage 7 SurferSEO audit: counts against the Surfer plan's API quota (~1–2 audit units per run; one additional if the revision loop fires)
 - **Total per blog post: ~$0.15–0.30** in pay-as-you-go costs + Surfer plan usage
 
 [Stage details below — each section is a step the skill must execute in order.]
@@ -86,15 +85,15 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-# Optional Surfer key — when set, Stage 4's manual pause is skipped and Stage 8
-# (automated Surfer audit + revision loop) runs after deploy. When absent, the
-# original manual workflow is used.
+# Optional Surfer key — when set, the Surfer audit + revision loop (Stage 7)
+# runs automatically after deploy. When absent, the skill simply stops at the
+# preview URL with no Surfer scoring. There is no manual Surfer step.
 if [ -n "$SURFER_API_KEY" ] && [[ "$SURFER_API_KEY" != *"your_"*"_here" ]]; then
   SURFER_MODE="automated"
-  echo "✓ env keys loaded (2 required + SURFER_API_KEY → Surfer is AUTOMATED via Stage 8)"
+  echo "✓ env keys loaded (2 required + SURFER_API_KEY → Surfer audit loop will run at Stage 7)"
 else
   SURFER_MODE="manual"
-  echo "✓ env keys loaded (2 required; no SURFER_API_KEY → Stage 4 will pause for manual Surfer pass)"
+  echo "✓ env keys loaded (2 required; no SURFER_API_KEY → Surfer scoring skipped, stops at preview URL)"
 fi
 export SURFER_MODE
 ```
@@ -150,7 +149,7 @@ Examples:
 
 ### 1.3 — Detect if this is a pet article
 
-Set `IS_PET_ARTICLE=true` if `USER_TOPIC` contains any of: `dog`, `dogs`, `cat`, `cats`, `puppy`, `puppies`, `kitten`, `kittens`, `pet`, `pets`, `feline`, `canine`. Otherwise `false`. This controls whether `<ReviewedByDrAlex />` is included in Stage 6.
+Set `IS_PET_ARTICLE=true` if `USER_TOPIC` contains any of: `dog`, `dogs`, `cat`, `cats`, `puppy`, `puppies`, `kitten`, `kittens`, `pet`, `pets`, `feline`, `canine`. Otherwise `false`. This controls whether `<ReviewedByDrAlex />` is included in Stage 5.
 
 ### 1.4 — Set up the working directory
 
@@ -247,7 +246,7 @@ python3 -c "import json; json.load(open('/tmp/celsius-skill/$SLUG/research.json'
   KD:                  <difficulty>
   Intent:              <intent>
   Word count target:   <word_count>
-  Pet article?         <yes/no — affects Dr. Alex block in Stage 6>
+  Pet article?         <yes/no — affects Dr. Alex block in Stage 5>
 
   Secondary keywords (top 5-10):
     - <kw1>
@@ -482,6 +481,12 @@ m['current_stage'] = 3
 json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
 "
 
+# Seed the canonical working draft. There is no separate manual-optimization
+# step anymore — Surfer optimization happens post-deploy in the Stage 7 audit
+# loop, which revises this file in place. Stages 4-5 read draft-optimized.md.
+cp /tmp/celsius-skill/$SLUG/draft.md /tmp/celsius-skill/$SLUG/draft-optimized.md
+echo "✓ seeded draft-optimized.md (passthrough; Surfer optimization runs in Stage 7)"
+
 echo "
 ✓ Stage 3 complete
 
@@ -497,121 +502,9 @@ echo "
 
 ---
 
-## Stage 4 — SurferSEO (conditional)
+## Stage 4 — Image Generation (Gemini / NanoBanana)
 
-### 4.0 — Branch on SURFER_MODE
-
-```bash
-if [ "$SURFER_MODE" = "automated" ]; then
-  echo "⚡ Stage 4 skipped — Surfer integration is automated (will run in Stage 8 after deploy)"
-  # Use the un-Surfered draft as the optimized version; Stage 8 handles scoring.
-  cp /tmp/celsius-skill/$SLUG/draft.md /tmp/celsius-skill/$SLUG/draft-optimized.md
-  echo "✓ draft.md → draft-optimized.md (passthrough)"
-  echo "✓ Stage 4 complete (auto-skipped)"
-  # Skip the rest of Stage 4. Proceed directly to Stage 5.
-else
-  echo "🤚 Stage 4: SurferSEO manual pause (SURFER_API_KEY not configured)"
-  # Continue below for manual flow.
-fi
-```
-
-If `SURFER_MODE=automated`, jump to Stage 5. Otherwise continue with the manual pause described below.
-
-### 4.1 — (manual mode only) Output instructions to the user
-
-This is a **manual checkpoint** — only reached when `SURFER_API_KEY` is not set. The skill stops execution and waits for the user.
-
-### 4.1 — Output instructions to the user
-
-```
-─────────────────────────────────────────────────────────────────────
-SURFERSEO STEP — MANUAL
-
-The draft is ready at:
-  /tmp/celsius-skill/<SLUG>/draft.md
-
-Steps:
-  1. Open SurferSEO Content Editor: https://app.surferseo.com
-  2. Create a new Content Editor query targeting: "<PRIMARY_KEYWORD>"
-  3. Open draft.md, copy its full contents (Cmd+A, Cmd+C)
-  4. Paste into Surfer's editor
-  5. Optimize until score ≥80:
-     - Apply Surfer's suggested terms where they fit naturally
-     - Hit the word-count target
-     - Don't sacrifice readability for score
-  6. When done, copy the optimized text
-  7. Paste it back into this conversation as your next message
-
-I'll wait for your paste.
-─────────────────────────────────────────────────────────────────────
-```
-
-### 4.2 — Wait for the user's paste
-
-Stop and wait. The user's next message should contain the optimized draft (likely a large markdown block).
-
-When it arrives, save the contents using the Write tool:
-- Path: `/tmp/celsius-skill/$SLUG/draft-optimized.md`
-- Content: the user's paste, verbatim
-
-### 4.3 — Quality probe on the pasted content
-
-```bash
-DRAFT_OPT="/tmp/celsius-skill/$SLUG/draft-optimized.md"
-
-OPT_WORDS=$(wc -w < "$DRAFT_OPT")
-OPT_IMG=$(grep -c "^\[IMAGE:" "$DRAFT_OPT")
-OPT_FAQ=$(grep -c "^\*\*Q:" "$DRAFT_OPT")
-
-# Compare to pre-Surfer draft
-ORIG_IMG=$(grep -c "^\[IMAGE:" "/tmp/celsius-skill/$SLUG/draft.md")
-ORIG_FAQ=$(grep -c "^\*\*Q:" "/tmp/celsius-skill/$SLUG/draft.md")
-
-echo "Optimized words: $OPT_WORDS"
-echo "Image tags:      $OPT_IMG  (was $ORIG_IMG)"
-echo "FAQs:            $OPT_FAQ  (was $ORIG_FAQ)"
-
-if [ "$OPT_WORDS" -lt 800 ]; then
-  echo "⚠️  Optimized draft seems short ($OPT_WORDS words). Did you paste the FULL optimized text?"
-  echo "    Confirm before we proceed."
-fi
-
-if [ "$OPT_IMG" -lt "$ORIG_IMG" ]; then
-  echo "⚠️  Image tags dropped from $ORIG_IMG → $OPT_IMG during Surfer edit."
-  echo "    Stage 5 will only generate images for the tags that remain."
-fi
-
-if [ "$OPT_FAQ" -lt 3 ]; then
-  echo "⚠️  Only $OPT_FAQ FAQs in optimized draft. FAQPage schema needs at least a few."
-fi
-```
-
-Warnings are non-fatal. The user confirms whether to proceed.
-
-### 4.4 — Update metadata + report
-
-```bash
-python3 -c "
-import json
-m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 4
-json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
-"
-
-echo "
-✓ Stage 4 complete
-
-  Optimized draft saved: /tmp/celsius-skill/$SLUG/draft-optimized.md
-  Words: $OPT_WORDS
-  Ready to proceed to Stage 5 (image generation)?
-"
-```
-
----
-
-## Stage 5 — Image Generation (Gemini / NanoBanana)
-
-### 5.1 — Verify Pillow is available
+### 4.1 — Verify Pillow is available
 
 The skill converts Gemini's JPEG output to WebP using Python Pillow.
 
@@ -621,7 +514,7 @@ python3 -c "from PIL import Image" 2>/dev/null \
 echo "✓ Pillow available"
 ```
 
-### 5.2 — Parse image tags from the optimized draft
+### 4.2 — Parse image tags from the optimized draft
 
 ```bash
 WORK_DIR="/tmp/celsius-skill/$SLUG"
@@ -644,13 +537,13 @@ if [ "$EXPECTED_COUNT" -lt 3 ]; then
 fi
 ```
 
-### 5.3 — Load the style guide
+### 4.3 — Load the style guide
 
 ```bash
 STYLE_GUIDE=$(cat .claude/skills/create-blog-post/reference/image-style-guide.md)
 ```
 
-### 5.4 — Generate each image
+### 4.4 — Generate each image
 
 For each entry in `image-tags.json`, build a Gemini prompt and call the API. Use Python (cleaner JSON handling + base64 decode + WebP convert in one block).
 
@@ -726,11 +619,11 @@ for i, tag in enumerate(tags, 1):
 
 print(f"\nGenerated {len(generated)}/{len(tags)} images")
 if len(generated) != len(tags):
-    print("⚠️  Some images failed to generate. You may want to re-run Stage 5 for the missing ones.")
+    print("⚠️  Some images failed to generate. You may want to re-run Stage 4 for the missing ones.")
 PY
 ```
 
-### 5.5 — Verify all expected images exist
+### 4.5 — Verify all expected images exist
 
 ```bash
 EXPECTED=$(python3 -c "import json; print(len(json.load(open('$WORK_DIR/image-tags.json'))))")
@@ -740,44 +633,44 @@ echo "Expected: $EXPECTED images"
 echo "Actual:   $ACTUAL images"
 
 if [ "$EXPECTED" -ne "$ACTUAL" ]; then
-  echo "❌ Image count mismatch. Stage 6 will fail without all images."
+  echo "❌ Image count mismatch. Stage 5 will fail without all images."
   echo "    Either regenerate the missing ones or remove the failed tags from draft-optimized.md."
   exit 1
 fi
 ```
 
-### 5.6 — Regeneration support
+### 4.6 — Regeneration support
 
 If the user requests "regenerate the hero image" (or any specific name), re-run the loop above for ONLY that tag. Don't re-generate the ones already done.
 
-### 5.7 — Update metadata + report
+### 4.7 — Update metadata + report
 
 ```bash
 python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 5
+m['current_stage'] = 4
 json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
 "
 
 echo "
-✓ Stage 5 complete
+✓ Stage 4 complete
 
   Images generated: $ACTUAL
   Saved to:         src/assets/blog/${SLUG}-*.webp
 
-  Review them before Stage 6 — open the files locally to spot-check brand consistency.
+  Review them before Stage 5 — open the files locally to spot-check brand consistency.
   Say 'regenerate <name>' if any image needs a re-roll.
 "
 ```
 
 ---
 
-## Stage 6 — Scaffold Framework Files
+## Stage 5 — Scaffold Framework Files
 
 **Template-driven** — read the cat-ear-infection files as live templates, substitute new content, write 4 new files. NEVER generate from scratch.
 
-### 6.1 — Compute names
+### 5.1 — Compute names
 
 ```bash
 WORK_DIR="/tmp/celsius-skill/$SLUG"
@@ -805,7 +698,7 @@ echo "FAQs constant:  $FAQS_CONSTANT"
 echo "Pascal core:    $PASCAL_CORE"
 ```
 
-### 6.2 — Read templates + draft
+### 5.2 — Read templates + draft
 
 Use Read tool on:
 - `src/pages/cat-ear-infection.astro` (template for the new page)
@@ -814,7 +707,7 @@ Use Read tool on:
 - `src/lib/blog/cat-ear-infection-faqs.ts` (template for FAQs)
 - `$WORK_DIR/draft-optimized.md` (the new content)
 
-### 6.3 — Generate the 4 files
+### 5.3 — Generate the 4 files
 
 For each file, do a careful template substitution. Apply across all 4:
 - `cat-ear-infection` → `$SLUG` (in all file paths, URLs, import paths, slug references)
@@ -824,7 +717,7 @@ For each file, do a careful template substitution. Apply across all 4:
 - `buildCatEarInfection*` → `build${PASCAL_CORE}*` (JSON-LD builder functions)
 - Frontmatter values (title, description, canonical, ogImage) → from the draft's YAML frontmatter
 - Body content of the view → translated from the draft markdown (sections, FAQs, references, CTA)
-- Image imports in the view → `<slug>-{hero,...}.webp` matching what Stage 5 produced
+- Image imports in the view → `<slug>-{hero,...}.webp` matching what Stage 4 produced
 
 **Page route** (`src/pages/<slug>.astro`):
 - Same import structure as cat-ear-infection.astro
@@ -845,7 +738,7 @@ For each file, do a careful template substitution. Apply across all 4:
 - Export `build${PASCAL_CORE}FaqJsonLd(faqs?)` function (FAQPage schema)
 - Export `build${PASCAL_CORE}ArticleJsonLd()` function (Article schema with @id = canonical URL)
 
-### 6.4 — Hard guarantees (ALL must pass — fix-and-retry on failure)
+### 5.4 — Hard guarantees (ALL must pass — fix-and-retry on failure)
 
 #### Check A — Slug + component-name consistency
 
@@ -893,7 +786,7 @@ if [ "$IMG_IMPORTS" -ne "$IMG_FILES" ]; then
   echo "❌ View imports $IMG_IMPORTS images but $IMG_FILES files exist on disk"
   echo "    Missing files would break the build. Either:"
   echo "    - Remove unused imports from the view"
-  echo "    - Re-run Stage 5 to generate the missing images"
+  echo "    - Re-run Stage 4 to generate the missing images"
   exit 1
 fi
 echo "✓ B. image imports match files ($IMG_FILES each)"
@@ -982,13 +875,13 @@ fi
 echo "✓ H. components loaded in build"
 ```
 
-### 6.5 — Update metadata + report
+### 5.5 — Update metadata + report
 
 ```bash
 python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 6
+m['current_stage'] = 5
 m['files'] = [
   'src/pages/$SLUG.astro',
   'src/views/blog/$COMPONENT_NAME.tsx',
@@ -999,7 +892,7 @@ json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
 "
 
 echo "
-✓ Stage 6 complete
+✓ Stage 5 complete
 
   Files written:
     - src/pages/$SLUG.astro
@@ -1012,19 +905,19 @@ echo "
 "
 ```
 
-### What Stage 6 explicitly does NOT do
+### What Stage 5 explicitly does NOT do
 
 - Does NOT modify any existing file (only creates new ones)
 - Does NOT touch `astro.config.mjs`, `package.json`, `tsconfig.json`, or any framework config
 - Does NOT change the cat-ear-infection files (they remain the canonical template)
 - Does NOT alter the `<ReviewedByDrAlex />` component (only references it)
-- Does NOT commit or push (that's Stage 7's job)
+- Does NOT commit or push (that's Stage 6's job)
 
 ---
 
-## Stage 7 — Deploy Preview URL
+## Stage 6 — Deploy Preview URL
 
-### 7.1 — Confirm we're on the right base
+### 6.1 — Confirm we're on the right base
 
 ```bash
 # We expect to be on a working branch (either main or some feature branch).
@@ -1038,7 +931,7 @@ if [ "$CURRENT" = "preview/$SLUG" ]; then
 fi
 ```
 
-### 7.2 — Create or switch to the preview branch
+### 6.2 — Create or switch to the preview branch
 
 ```bash
 BRANCH="preview/$SLUG"
@@ -1052,17 +945,17 @@ else
 fi
 ```
 
-### 7.3 — Stage all generated files
+### 6.3 — Stage all generated files
 
 ```bash
-# Read file list from metadata (set in Stage 6.5)
+# Read file list from metadata (set in Stage 5.5)
 FILES=$(python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
 print(' '.join(m['files']))
 ")
 
-# Plus the image assets generated in Stage 5
+# Plus the image assets generated in Stage 4
 git add $FILES src/assets/blog/${SLUG}-*.webp
 
 # Verify staging
@@ -1070,7 +963,7 @@ echo "=== files staged for commit ==="
 git status -s
 ```
 
-### 7.4 — Commit + push
+### 6.4 — Commit + push
 
 ```bash
 git commit -m "blog: add post '$SLUG' (preview deploy)
@@ -1085,7 +978,7 @@ Auto-generated by .claude/skills/create-blog-post/SKILL.md"
 git push origin "$BRANCH" 2>&1 | tail -5
 ```
 
-### 7.5 — Poll for the preview to come live
+### 6.5 — Poll for the preview to come live
 
 ```bash
 # Cloudflare normalizes the branch name: preview/cat-ear-mites → preview-cat-ear-mites
@@ -1120,13 +1013,13 @@ if [ "$code" != "200" ]; then
 fi
 ```
 
-### 7.6 — Update metadata + output URL
+### 6.6 — Update metadata + output URL
 
 ```bash
 python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 7
+m['current_stage'] = 6
 m['preview_url'] = '$PREVIEW_URL'
 m['preview_branch'] = '$BRANCH'
 m['finished_at'] = '$(date -Iseconds)'
@@ -1154,30 +1047,30 @@ a human-approved merge to main.
 "
 ```
 
-### 7.7 — Branch on SURFER_MODE
+### 6.7 — Continue to Surfer audit loop (or stop)
 
 ```bash
 if [ "$SURFER_MODE" = "automated" ]; then
-  echo "→ Continuing to Stage 8 (Surfer audit + optional revision loop)"
-  # Don't STOP here. Stage 8 handles final stop.
+  echo "→ Continuing to Stage 7 (Surfer audit + revision loop)"
+  # Don't STOP here. Stage 7 handles the final stop.
 else
-  echo "✓ STOP — preview URL is ready for human review (Surfer was already handled at Stage 4 manually)"
+  echo "✓ STOP — preview URL ready for human review. No SURFER_API_KEY set, so Surfer scoring is skipped."
   exit 0
 fi
 ```
 
 ---
 
-## Stage 8 — Surfer Audit + Revision Loop (automated mode only)
+## Stage 7 — Surfer Audit + Revision Loop (automated mode only)
 
 Runs only when `SURFER_API_KEY` is set in `.env`. Audits the live preview URL, reads the content score, and if it's below threshold, asks Claude to revise the draft and re-deploys — looping until the threshold is met or guardrails fire.
 
 **Threshold:** 80 by default. Configurable via `SURFER_SCORE_THRESHOLD` env var.
 **Max iterations:** 4 by default. Configurable via `SURFER_MAX_ITERATIONS`. Each iteration = revise → re-scaffold → re-deploy → re-audit (~3–4 minutes).
 **Early-stop guardrail:** if a revision improves the score by less than 2 points compared to the previous iteration, the loop stops — usually means we've hit the natural ceiling for that draft. Saves API credits + time.
-**Hard time cap:** 20 minutes total wall-clock for Stage 8. After that the loop exits with whatever the latest score is.
+**Hard time cap:** 20 minutes total wall-clock for Stage 7. After that the loop exits with whatever the latest score is.
 
-### 8.1 — Trigger the first audit for the preview URL
+### 7.1 — Trigger the first audit for the preview URL
 
 ```bash
 SURFER_SCORE_THRESHOLD="${SURFER_SCORE_THRESHOLD:-80}"
@@ -1215,7 +1108,7 @@ fi
 echo "✓ Audit created (id=$AUDIT_ID), waiting for completion..."
 ```
 
-### 8.2 — Poll the audit until completed
+### 7.2 — Poll the audit until completed
 
 ```bash
 end=$(($(date +%s) + 240))  # up to 4 min
@@ -1234,7 +1127,7 @@ while [ $(date +%s) -lt $end ]; do
 done
 ```
 
-### 8.3 — Read the score
+### 7.3 — Read the score
 
 ```bash
 SCORE=$(python3 -c "
@@ -1247,7 +1140,7 @@ print(score)
 echo "✓ SurferSEO content_score: $SCORE / 100 (threshold: $SURFER_SCORE_THRESHOLD)"
 ```
 
-### 8.4 — Score tracking + early-exit on first audit
+### 7.4 — Score tracking + early-exit on first audit
 
 Initialize iteration state. Track every score so we can detect plateaus.
 
@@ -1266,7 +1159,7 @@ if [ "$SCORE" -ge "$SURFER_SCORE_THRESHOLD" ]; then
 fi
 ```
 
-### 8.5 — Revision loop (runs up to SURFER_MAX_ITERATIONS times)
+### 7.5 — Revision loop (runs up to SURFER_MAX_ITERATIONS times)
 
 Repeat the block below as long as ALL of these are true:
 - `LATEST_SCORE < SURFER_SCORE_THRESHOLD`
@@ -1288,7 +1181,7 @@ while [ "$LATEST_SCORE" -lt "$SURFER_SCORE_THRESHOLD" ] \
   echo "─── Iteration $ITERATION / $SURFER_MAX_ITERATIONS — previous score: $PREV_SCORE, target: $SURFER_SCORE_THRESHOLD ───"
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.1 — Surface audit findings for Claude to revise against
+  # 7.5.1 — Surface audit findings for Claude to revise against
   # ─────────────────────────────────────────────────────────────────────
   python3 -c "
 import json
@@ -1300,7 +1193,7 @@ print(json.dumps(d, indent=2)[:4000])
   echo "→ Asking Claude to revise the draft (iteration $ITERATION)..."
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.2 — Claude (runtime) performs the revision:
+  # 7.5.2 — Claude (runtime) performs the revision:
   #   1. Read /tmp/celsius-skill/$SLUG/draft-optimized.md (current body)
   #   2. Read /tmp/celsius-skill/$SLUG/audit-context-${ITERATION}.txt
   #   3. Revise body content ONLY. Do NOT touch:
@@ -1316,15 +1209,15 @@ print(json.dumps(d, indent=2)[:4000])
   # ─────────────────────────────────────────────────────────────────────
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.3 — Re-scaffold the 4 framework files from the revised draft
+  # 7.5.3 — Re-scaffold the 4 framework files from the revised draft
   # (same slug, same component name, same image filenames — only body
   # content changes)
   # ─────────────────────────────────────────────────────────────────────
   echo "→ Re-scaffolding files with revised draft..."
-  # (Claude executes Stage 6's file-write steps again here.)
+  # (Claude executes Stage 5's file-write steps again here.)
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.4 — Build validation
+  # 7.5.4 — Build validation
   # ─────────────────────────────────────────────────────────────────────
   npm run build 2>&1 | tee /tmp/celsius-skill/$SLUG/build-iter-${ITERATION}.log
   BUILD_EXIT=${PIPESTATUS[0]}
@@ -1336,7 +1229,7 @@ print(json.dumps(d, indent=2)[:4000])
   fi
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.5 — Commit + push the revision to the same preview branch
+  # 7.5.5 — Commit + push the revision to the same preview branch
   # ─────────────────────────────────────────────────────────────────────
   git add \
     src/pages/$SLUG.astro \
@@ -1349,7 +1242,7 @@ Previous Surfer score: $PREV_SCORE / 100
 Threshold:            $SURFER_SCORE_THRESHOLD
 Iteration:            $ITERATION / $SURFER_MAX_ITERATIONS
 
-Auto-revised by Stage 8 of create-blog-post skill."
+Auto-revised by Stage 7 of create-blog-post skill."
 
   git push origin "$BRANCH" 2>&1 | tail -3
 
@@ -1357,7 +1250,7 @@ Auto-revised by Stage 8 of create-blog-post skill."
   sleep 90
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.6 — Re-audit
+  # 7.5.6 — Re-audit
   # ─────────────────────────────────────────────────────────────────────
   echo "→ Submitting audit $((ITERATION + 1))..."
 
@@ -1403,7 +1296,7 @@ print(d.get('audited_page', {}).get('content_score', 0))
   echo "✓ Iteration $ITERATION score: $LATEST_SCORE / 100 (was: $PREV_SCORE; movement: $((LATEST_SCORE - PREV_SCORE)))"
 
   # ─────────────────────────────────────────────────────────────────────
-  # 8.5.7 — Early-stop guardrail: plateau detection
+  # 7.5.7 — Early-stop guardrail: plateau detection
   # ─────────────────────────────────────────────────────────────────────
   if [ "$ITERATION" -ge 2 ]; then
     DELTA=$((LATEST_SCORE - PREV_SCORE))
@@ -1415,7 +1308,7 @@ print(d.get('audited_page', {}).get('content_score', 0))
 done
 ```
 
-### 8.6 — Final report
+### 7.6 — Final report
 
 ```bash
 # Determine outcome label
@@ -1433,7 +1326,7 @@ fi
 python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 8
+m['current_stage'] = 7
 m['surfer_score_initial'] = $INITIAL_SCORE
 m['surfer_score_final'] = $LATEST_SCORE
 m['surfer_iterations'] = $ITERATION
@@ -1458,15 +1351,15 @@ NEXT STEPS (human):
   3. If you want to push the score higher: edit
      src/views/blog/${COMPONENT_NAME}.tsx,
      push to the same branch — same URL re-deploys and you can
-     re-trigger Stage 8 manually
+     re-trigger Stage 7 manually
   4. Merge $BRANCH → main when approved
 ─────────────────────────────────────────────────────────────────────
 REPORT
 ```
 
-### 8.9 — STOP
+### 7.7 — STOP
 
-Stage 8 ends. Do not auto-merge, do not re-iterate beyond once. Human reviews + merges.
+Stage 7 ends. Do not auto-merge. The revision loop already ran (up to the configured max iterations). Human reviews + merges.
 
 ---
 
