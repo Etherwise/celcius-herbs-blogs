@@ -12,20 +12,23 @@ Your team opens the framework folder in Claude Code, says something like:
 
 > "Create a new blog post about cat ear mites"
 
-…and a 7-stage pipeline runs:
+…and an 8-stage pipeline runs **fully automatically** — no manual steps:
 
+0. **Pre-flight** (checks your API keys are set)
 1. **Keyword research** (Ahrefs — finds the best target keyword, related terms, word count)
 2. **Content research** (Perplexity — pulls sourced facts with citations from vet/medical sources)
 3. **Drafting** (Claude writes the full ~2,000-word article in markdown)
-4. **PAUSE for SurferSEO** (the only manual step — you optimize the draft, paste it back)
+4. **SurferSEO term optimization** (fetches Surfer's ranking-term database, scores the draft's term coverage, and revises until coverage clears the threshold — up to 4 rounds)
 5. **Image generation** (Gemini generates 5 brand-consistent images)
 6. **File scaffolding** (all 4 framework files created, build validated)
 7. **Preview deploy** (pushes a preview branch, gives you a shareable Cloudflare URL)
 
-**Total time per post:** ~25–30 minutes (most of that is the manual Surfer pass).
-**Cost per post:** ~$0.25 in API spend.
+**Total time per post:** ~10–20 minutes, fully hands-off.
+**Cost per post:** ~$0.25 in API spend + ~1 Surfer Content Editor query.
 
-The skill **never auto-publishes**. Stage 7 stops at a preview URL for human review. You (or Dr. Alex) review, approve, then merge the preview branch to production.
+The skill **never auto-publishes**. The final stage stops at a preview URL for human review. You (or Dr. Alex) review, approve, then merge the preview branch to production.
+
+> **A note on the SurferSEO step (important).** Surfer's public API does **not** let software read the browser "Content Editor score" (the 0–100 you see in the Surfer app) for your content — there's no way to submit content through the API and get that score back. What the API *does* expose is Surfer's full **ranking-term database** for a keyword: 300+ terms, each with a target usage range. So Stage 4 optimizes the draft to cover those terms within range — which is the thing that actually drives rankings — and reports a **term-coverage score** derived from Surfer's real data. It correlates with the browser score but is its own number. If your team wants the exact browser score on a post, open it in the Surfer Content Editor manually after publish; the automated step has already done the term work.
 
 ---
 
@@ -41,7 +44,7 @@ Whatever way you usually launch Claude Code — make sure it's pointed at this f
 /path/to/celsius-astrolovable/
 ```
 
-### 2. Get the two API keys
+### 2. Get the three API keys
 
 **OpenRouter** (for the Perplexity research call):
 - Sign up: <https://openrouter.ai/keys>
@@ -53,6 +56,10 @@ Whatever way you usually launch Claude Code — make sure it's pointed at this f
 - Pay-as-you-go billing
 - Cost: ~$0.10–0.20 per blog post (5 images each)
 
+**SurferSEO** (for the automated term-optimization loop):
+- Get it in Surfer: app.surferseo.com → Settings → API (requires a Surfer plan with API access)
+- Cost: ~1 Content Editor query per post against your Surfer quota (the revision loop re-scores locally — no extra Surfer calls)
+
 ### 3. Add the keys to `.env`
 
 The framework root has a `.env` file (it's gitignored — never committed). Open it and add:
@@ -60,9 +67,17 @@ The framework root has a `.env` file (it's gitignored — never committed). Open
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
 GEMINI_API_KEY=AIza...
+SURFER_API_KEY=...
+
+# Cloudflare — lets the skill resolve the real preview URL after deploy.
+# These are the same values already set as GitHub Actions secrets.
+CLOUDFLARE_API_TOKEN=cfut_...
+CLOUDFLARE_ACCOUNT_ID=...
 ```
 
-Save. That's the API setup done.
+Save. That's the API setup done. (The two Cloudflare values are the same ones in your repo's GitHub Actions secrets — Cloudflare truncates long preview-branch names, so the skill asks the Cloudflare API for the real URL instead of guessing it.)
+
+> **Optional tuning** (defaults are fine for most posts): add `SURFER_SCORE_THRESHOLD=70` to change the target term-coverage score, or `SURFER_MAX_ITERATIONS=4` to change how many revision rounds the loop will attempt.
 
 ### 4. Install Pillow (one Python library — required for image conversion)
 
@@ -109,43 +124,35 @@ Or even simpler — Claude will auto-trigger the skill if you say:
 
 The skill will activate. Claude will announce "Using the create-blog-post skill" and start Stage 0.
 
-### Step 3: Walk through the stages
+### Step 3: Let it run — no manual steps
 
-You'll see Claude work through each stage with status messages. Most stages run on their own. **The one stage you have to do is Stage 4** — SurferSEO optimization.
+You'll see Claude work through each stage with status messages. **Every stage runs on its own — you don't have to do anything.** Just watch (or walk away and come back).
 
-When Stage 4 hits, Claude pauses and prints something like this:
+The notable part is the **SurferSEO term-optimization stage (Stage 4)**, which runs right after the draft is written and before images/deploy. The skill:
+
+1. Fetches Surfer's full ranking-term database for your keyword (300+ terms, each with a target usage range)
+2. Scores the draft's term coverage against those targets
+3. If coverage is **at or above the threshold (default 70)**, it's done
+4. If it's **below**, Claude automatically rewrites the draft to work in the under-target terms, then re-scores — repeating up to 4 times until it clears the threshold (or plateaus)
+
+You'll see output like this as it loops:
 
 ```
-─────────────────────────────────────────────
-SURFERSEO STEP — MANUAL
+Initial coverage score: 28 / 100 (threshold: 70)
+─── Iteration 1 / 4 — score 28, target 70 ───
+  iteration 1 score: 48 (was 28; Δ 20)
+─── Iteration 2 / 4 — score 48, target 70 ───
+  iteration 2 score: 66 (was 48; Δ 18)
+─── Iteration 3 / 4 — score 66, target 70 ───
+  iteration 3 score: 74 (was 66; Δ 8)
 
-The draft is ready at:
-  /tmp/celsius-skill/probiotics-for-dogs/draft.md
-
-Steps:
-  1. Open SurferSEO Content Editor: https://app.surferseo.com
-  2. Create a new Content Editor query targeting: "probiotics for dogs"
-  3. Open draft.md, copy its full contents
-  4. Paste into Surfer's editor
-  5. Optimize until score ≥80
-  6. Copy the optimized text
-  7. Paste it back here as your next message
-─────────────────────────────────────────────
+✓ Stage 4 complete — ✓ THRESHOLD MET
+Surfer term coverage: 28 → 48 → 66 → 74 / 100
 ```
 
-What you actually do:
+That's it — no copy-pasting into Surfer, no manual optimization. The whole thing is hands-off.
 
-1. **Open Terminal**, run: `open /tmp/celsius-skill/[your-slug]/draft.md`
-   (Or just paste the path into your file browser.)
-2. **Copy** the whole file (Cmd+A, Cmd+C).
-3. **Go to SurferSEO Content Editor** in your browser.
-4. **Create a new query** for the keyword Claude mentioned (e.g. "probiotics for dogs").
-5. **Paste your draft** into Surfer's editor.
-6. **Apply Surfer's suggestions** — add missing terms where they fit naturally. Aim for a score of 80+.
-7. **Copy the optimized text** out of Surfer.
-8. **Paste it back into Claude Code** as your next message.
-
-Claude saves your paste and continues to Stage 5 (image generation).
+> If you ever want to run a post WITHOUT Surfer (faster, no optimization), just remove `SURFER_API_KEY` from `.env` — the skill skips Stage 4 entirely and ships the draft as written.
 
 ### Step 4: Review the preview URL
 
@@ -189,7 +196,6 @@ The URL is real, public, and shareable. Send it to Dr. Alex. Pull it up on your 
 Setting expectations:
 
 - **Does NOT auto-publish.** The skill stops at the preview URL. Going live requires you to manually merge the preview branch to `main`.
-- **Does NOT generate the SurferSEO score.** Surfer's content editor is browser-only — no API. You optimize in the browser, paste back. This is the one manual step in the pipeline.
 - **Does NOT replace Dr. Alex's review.** For pet articles, the `<ReviewedByDrAlex />` block is auto-included, but his actual sign-off on the content is human work.
 - **Does NOT touch the existing live posts** (e.g. cat-ear-infection). New posts only.
 - **Does NOT modify framework configuration files** (`astro.config.mjs`, `package.json`, etc.).
@@ -203,10 +209,10 @@ Setting expectations:
 
 | Stage | Time |
 |---|---|
-| Stages 1–3 (research + draft) | ~5 minutes (skill runs on its own) |
-| Stage 4 (Surfer pass) | ~10–15 minutes (manual) |
-| Stages 5–7 (images + scaffold + preview) | ~5–8 minutes (skill runs on its own) |
-| **Total** | **~25–30 minutes per post** |
+| Stages 1–3 (research + draft) | ~5 minutes |
+| Stage 4 (Surfer term optimization) | ~2–6 minutes (1 Surfer query + a few local revision rounds) |
+| Stages 5–7 (images + scaffold + preview deploy) | ~5–8 minutes |
+| **Total** | **~12–20 minutes per post, fully hands-off** |
 
 For reference: the original cat-ear-infection post took ~13 hours to produce manually.
 
@@ -228,9 +234,9 @@ Two options:
 
 Every stage saves its output to `/tmp/celsius-skill/[your-slug]/`. If something breaks, the files from earlier stages are still there. Tell Claude *"continue the skill from where it stopped"* and it can resume.
 
-### "What if I don't want to use SurferSEO?"
+### "What if I don't want to use SurferSEO on a particular post?"
 
-You can skip it — tell Claude *"skip the Surfer stage"* at the Stage 4 pause. The skill copies the un-optimized draft forward. You'll lose the SEO score boost but the post still ships. (We recommend using Surfer — the score improvements are real.)
+Remove (or comment out) `SURFER_API_KEY` in `.env` before running the skill. The pipeline skips Stage 4 (term optimization) and ships the draft as written. Add the key back when you want optimization again. (We recommend leaving it on — the term-coverage improvements are real and cost almost nothing.)
 
 ### "Can I do multiple posts in parallel?"
 
@@ -272,14 +278,14 @@ The skill is a single markdown file (`SKILL.md`) plus 3 reference files (style g
 
 | Stage | Tool | What it does |
 |---|---|---|
-| 0 | (none) | Validates `.env`, Ahrefs MCP, git tree |
+| 0 | (none) | Validates `.env`, Ahrefs MCP, git tree; detects Surfer key |
 | 1 | Ahrefs MCP | Keyword overview + matching terms → `research.json` |
 | 2 | OpenRouter (Perplexity sonar-pro) | Sourced research with citations → `perplexity-research.md` |
 | 3 | Claude itself | Drafts the article using research + structure template → `draft.md` |
-| 4 | Manual / SurferSEO | User optimizes draft externally → `draft-optimized.md` |
+| 4 | SurferSEO API + `surfer-coverage.py` | Fetches Surfer's term database, scores coverage, loops (revise → re-score) until threshold → `draft-optimized.md` |
 | 5 | Gemini 3.1 Flash Image Preview | Generates 5 brand-styled WebP images → `src/assets/blog/[slug]-*.webp` |
 | 6 | Claude with templates | Scaffolds 4 framework files mirroring cat-ear-infection structure |
-| 7 | GitHub Actions + Cloudflare Pages | Pushes preview branch → preview URL |
+| 7 | GitHub Actions + Cloudflare Pages | Pushes preview branch → resolves real preview URL via Cloudflare API |
 
 Each stage's output feeds the next. The 8 hard guarantees at Stage 6 (slug consistency, image-imports parity, build validation, etc.) prevent broken builds from ever reaching the preview deploy.
 
@@ -291,15 +297,16 @@ Each stage's output feeds the next. The 8 hard guarantees at Stage 6 (slug consi
 SETUP (once)
   ☐ Add OPENROUTER_API_KEY to .env
   ☐ Add GEMINI_API_KEY to .env
+  ☐ Add SURFER_API_KEY to .env
+  ☐ Add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID to .env
   ☐ python3 -m pip install Pillow
 
-NEW POST
+NEW POST (fully hands-off)
   1. Open Claude Code in framework folder
   2. "Create a blog post about [topic]"
-  3. Wait for Stage 4 SURFERSEO STEP
-  4. Optimize in Surfer, paste back
-  5. Wait for preview URL
-  6. Review → share with Dr. Alex → approve → merge to main
+  3. Wait — research, draft, Surfer term optimization, images,
+     scaffold, and deploy all run automatically
+  4. Review the preview URL → share with Dr. Alex → approve → merge to main
 ```
 
 That's the whole loop. Good luck — and ship.

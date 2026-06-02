@@ -1,25 +1,25 @@
 ---
 name: create-blog-post
-description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, image generation, file scaffolding, and preview deploy. Pauses once for the user to optimize the draft in SurferSEO manually.
+description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, an automated SurferSEO term-optimization loop (optimizes the draft against Surfer's ranking-term database until coverage clears the threshold), image generation, file scaffolding, and preview deploy. Fully hands-off when SURFER_API_KEY is configured; when it is not set, Surfer optimization is skipped and the draft ships as-is.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, mcp__ahrefs__keywords-explorer-overview, mcp__ahrefs__keywords-explorer-matching-terms, mcp__ahrefs__subscription-info-limits-and-usage
 ---
 
 # Create Celsius Herbs Blog Post
 
-Walks the user through a 7-stage pipeline that produces a fully-optimized, image-rich blog post and deploys it to a Cloudflare Pages preview URL for human review.
+Walks the user through an 8-stage pipeline that produces a fully-optimized, image-rich blog post, deploys it to a Cloudflare Pages preview URL, and auto-scores it through SurferSEO (with a revision loop) before handing back for human review.
 
 ## Stages
 
-0. **Pre-flight validation** — env keys, Ahrefs MCP, working directory
+0. **Pre-flight validation** — env keys, Ahrefs MCP, working directory, optional Surfer key
 1. **Keyword research** — Ahrefs MCP
 2. **Content research** — OpenRouter → Perplexity (sonar-pro)
 3. **Draft article** — Claude writes the article (no external API)
-4. **PAUSE — SurferSEO** — user runs the draft through Surfer manually, pastes optimized version back
+4. **SurferSEO term optimization** — only runs when `SURFER_API_KEY` is set. Fetches Surfer's ranking-term database, scores the draft's term coverage, and loops (revise → re-score) until coverage clears the threshold (default 70) or guardrails fire. When no key, passthrough.
 5. **Image generation** — 5 brand-consistent images via Gemini 3.1 Flash Image Preview (NanoBanana)
 6. **Scaffold framework files** — 4 files into the Astro framework + 8 hard guarantees
-7. **Deploy preview URL** — push `preview/<slug>` branch, output Cloudflare URL, STOP
+7. **Deploy preview URL** — push `preview/<slug>` branch, output the Cloudflare preview URL, STOP
 
-The skill never auto-publishes. Stage 7 stops at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
+The skill never auto-publishes. Stage 7 always stops at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
 
 ## Working directory
 
@@ -35,10 +35,11 @@ Every run uses `/tmp/celsius-skill/<topic-slug>/` to stage intermediate outputs.
 
 ## Cost expectations per run
 
-- Stage 1 Ahrefs: ~50-100 units against Rick's MCP quota
+- Stage 1 Ahrefs: ~50-100 units against the configured Ahrefs MCP quota
 - Stage 2 Perplexity (via OpenRouter): ~$0.01–0.05
 - Stage 5 Gemini (5 images): ~$0.10–0.20
-- **Total per blog post: ~$0.15–0.30**
+- Stage 4 SurferSEO term optimization: counts against the Surfer plan's API quota (~1 Content Editor query per run; the revision loop re-scores locally, no extra Surfer calls)
+- **Total per blog post: ~$0.15–0.30** in pay-as-you-go costs + Surfer plan usage
 
 [Stage details below — each section is a step the skill must execute in order.]
 
@@ -84,7 +85,17 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "✓ env keys loaded (2 required keys present)"
+# Optional Surfer key — when set, the Surfer term-optimization loop (Stage 4)
+# runs automatically after drafting and before images/deploy. When absent, the
+# draft ships without Surfer optimization. There is no manual Surfer step.
+if [ -n "$SURFER_API_KEY" ] && [[ "$SURFER_API_KEY" != *"your_"*"_here" ]]; then
+  SURFER_MODE="automated"
+  echo "✓ env keys loaded (2 required + SURFER_API_KEY → Surfer term optimization will run at Stage 4)"
+else
+  SURFER_MODE="manual"
+  echo "✓ env keys loaded (2 required; no SURFER_API_KEY → Surfer optimization skipped, draft ships as-is)"
+fi
+export SURFER_MODE
 ```
 
 If this exits non-zero, STOP the skill. Tell the user the missing key(s) and instruct them to fix `.env`, then re-run.
@@ -458,7 +469,7 @@ echo "Desc len:     ${#DESC} chars (limit 155)"
 echo "✓ Draft validation passed"
 ```
 
-If any hard fail triggers, re-draft (don't move to Stage 4). If a non-fatal warning surfaces (e.g. citation count low), Claude can re-draft or move on at the user's discretion.
+If any hard fail triggers, re-draft (don't move to Stage 5). If a non-fatal warning surfaces (e.g. citation count low), Claude can re-draft or move on at the user's discretion.
 
 ### 3.4 — Update metadata + report
 
@@ -485,93 +496,148 @@ echo "
 
 ---
 
-## Stage 4 — PAUSE for SurferSEO
+## Stage 4 — SurferSEO Term Optimization
 
-This is a **manual checkpoint**. The skill stops execution and waits for the user.
+Optimizes the draft against SurferSEO's real ranking-term database **before**
+images and deploy. This is a text operation, so it belongs here (right after
+drafting) — not after deploy.
 
-### 4.1 — Output instructions to the user
+**Important — what the Surfer API can and cannot do.** Surfer's public API does
+NOT expose the browser Content Editor score for your content (there is no way to
+submit content and get the 0–100 "Surfer score" back), and the Audit endpoint's
+score is a different, harsher metric where even #1-ranked pages sit around 50. So
+this stage does NOT chase the browser score. Instead it uses the one genuinely
+useful thing the API exposes — `GET /content_editors/:id/terms`, the full term
+database (300+ terms, each with a target usage range) — and optimizes the draft
+to cover those terms within range. That is what actually drives rankings.
 
-```
-─────────────────────────────────────────────────────────────────────
-SURFERSEO STEP — MANUAL
+The score reported here is a **weighted term-coverage score** (0–100), computed by
+`surfer-coverage.py` from Surfer's real term targets. It correlates with the
+browser score but is its own number. Default threshold is 70.
 
-The draft is ready at:
-  /tmp/celsius-skill/<SLUG>/draft.md
-
-Steps:
-  1. Open SurferSEO Content Editor: https://app.surferseo.com
-  2. Create a new Content Editor query targeting: "<PRIMARY_KEYWORD>"
-  3. Open draft.md, copy its full contents (Cmd+A, Cmd+C)
-  4. Paste into Surfer's editor
-  5. Optimize until score ≥80:
-     - Apply Surfer's suggested terms where they fit naturally
-     - Hit the word-count target
-     - Don't sacrifice readability for score
-  6. When done, copy the optimized text
-  7. Paste it back into this conversation as your next message
-
-I'll wait for your paste.
-─────────────────────────────────────────────────────────────────────
-```
-
-### 4.2 — Wait for the user's paste
-
-Stop and wait. The user's next message should contain the optimized draft (likely a large markdown block).
-
-When it arrives, save the contents using the Write tool:
-- Path: `/tmp/celsius-skill/$SLUG/draft-optimized.md`
-- Content: the user's paste, verbatim
-
-### 4.3 — Quality probe on the pasted content
+### 4.0 — Branch on SURFER_MODE
 
 ```bash
-DRAFT_OPT="/tmp/celsius-skill/$SLUG/draft-optimized.md"
+WORK="/tmp/celsius-skill/$SLUG"
+SURFER_SCORE_THRESHOLD="${SURFER_SCORE_THRESHOLD:-70}"
+SURFER_MAX_ITERATIONS="${SURFER_MAX_ITERATIONS:-4}"
 
-OPT_WORDS=$(wc -w < "$DRAFT_OPT")
-OPT_IMG=$(grep -c "^\[IMAGE:" "$DRAFT_OPT")
-OPT_FAQ=$(grep -c "^\*\*Q:" "$DRAFT_OPT")
-
-# Compare to pre-Surfer draft
-ORIG_IMG=$(grep -c "^\[IMAGE:" "/tmp/celsius-skill/$SLUG/draft.md")
-ORIG_FAQ=$(grep -c "^\*\*Q:" "/tmp/celsius-skill/$SLUG/draft.md")
-
-echo "Optimized words: $OPT_WORDS"
-echo "Image tags:      $OPT_IMG  (was $ORIG_IMG)"
-echo "FAQs:            $OPT_FAQ  (was $ORIG_FAQ)"
-
-if [ "$OPT_WORDS" -lt 800 ]; then
-  echo "⚠️  Optimized draft seems short ($OPT_WORDS words). Did you paste the FULL optimized text?"
-  echo "    Confirm before we proceed."
-fi
-
-if [ "$OPT_IMG" -lt "$ORIG_IMG" ]; then
-  echo "⚠️  Image tags dropped from $ORIG_IMG → $OPT_IMG during Surfer edit."
-  echo "    Stage 5 will only generate images for the tags that remain."
-fi
-
-if [ "$OPT_FAQ" -lt 3 ]; then
-  echo "⚠️  Only $OPT_FAQ FAQs in optimized draft. FAQPage schema needs at least a few."
+if [ "$SURFER_MODE" != "automated" ]; then
+  cp "$WORK/draft.md" "$WORK/draft-optimized.md"
+  echo "✓ Stage 4 skipped (no SURFER_API_KEY) — draft.md → draft-optimized.md passthrough"
+  # Proceed directly to Stage 5.
 fi
 ```
 
-Warnings are non-fatal. The user confirms whether to proceed.
+If `SURFER_MODE=automated`, continue below. Otherwise jump to Stage 5.
+
+### 4.1 — Fetch Surfer's term database
+
+```bash
+PRIMARY=$(python3 -c "import json; print(json.load(open('$WORK/research.json'))['primary_keyword'])")
+
+python3 .claude/skills/create-blog-post/surfer-coverage.py fetch-terms \
+  --keyword "$PRIMARY" \
+  --out "$WORK/surfer-terms.json"
+```
+
+This creates a Content Editor query, waits for the SERP analysis (~60–90s), and
+saves the term database. On failure (bad key / quota), fall back to passthrough:
+`cp "$WORK/draft.md" "$WORK/draft-optimized.md"` and proceed to Stage 5.
+
+### 4.2 — Seed the working draft + score it
+
+```bash
+cp "$WORK/draft.md" "$WORK/draft-optimized.md"
+
+python3 .claude/skills/create-blog-post/surfer-coverage.py score \
+  --terms "$WORK/surfer-terms.json" \
+  --draft "$WORK/draft-optimized.md" \
+  --top 25 > "$WORK/coverage.json"
+
+SCORE=$(python3 -c "import json; print(json.load(open('$WORK/coverage.json'))['score'])")
+SCORE_HISTORY="$SCORE"
+echo "Initial coverage score: $SCORE / 100 (threshold: $SURFER_SCORE_THRESHOLD)"
+```
+
+### 4.3 — Revision loop
+
+Repeat the block below while ALL are true:
+- `SCORE < SURFER_SCORE_THRESHOLD`
+- `ITERATION < SURFER_MAX_ITERATIONS`
+- last iteration moved the score by ≥ 2 points (no plateau)
+
+Each pass: Claude reads the `under` list from `coverage.json` (terms below target,
+with `have → min` counts), revises `draft-optimized.md` to naturally work those
+terms in at roughly their target frequency, then re-scores.
+
+```bash
+ITERATION=0
+while [ "$SCORE" -lt "$SURFER_SCORE_THRESHOLD" ] && [ "$ITERATION" -lt "$SURFER_MAX_ITERATIONS" ]; do
+  ITERATION=$((ITERATION + 1))
+  PREV_SCORE="$SCORE"
+  echo "─── Iteration $ITERATION / $SURFER_MAX_ITERATIONS — score $SCORE, target $SURFER_SCORE_THRESHOLD ───"
+
+  # Claude (the runtime) now performs the revision:
+  #   1. Read $WORK/coverage.json — the "under" array lists each under-target
+  #      term with {term, have, min, max, weight, in_heading}.
+  #   2. Read $WORK/draft-optimized.md.
+  #   3. Revise the BODY PROSE to weave in the under-target terms at roughly
+  #      their target counts. Prioritize high-weight terms and in_heading=true
+  #      terms (work those into H2/H3 headings where natural).
+  #   4. DO NOT touch: the YAML frontmatter, the [IMAGE: ...] tags (exact count
+  #      + names must survive), or the number of FAQs.
+  #   5. Keep it readable — never keyword-stuff past the term's max.
+  #   6. Write the revised draft over $WORK/draft-optimized.md.
+
+  # Re-score
+  python3 .claude/skills/create-blog-post/surfer-coverage.py score \
+    --terms "$WORK/surfer-terms.json" \
+    --draft "$WORK/draft-optimized.md" \
+    --top 25 > "$WORK/coverage.json"
+  SCORE=$(python3 -c "import json; print(json.load(open('$WORK/coverage.json'))['score'])")
+  SCORE_HISTORY="$SCORE_HISTORY → $SCORE"
+  echo "  iteration $ITERATION score: $SCORE (was $PREV_SCORE; Δ $((SCORE - PREV_SCORE)))"
+
+  # Plateau guardrail
+  DELTA=$((SCORE - PREV_SCORE))
+  if [ "$DELTA" -lt 2 ]; then
+    echo "  ⚠ plateau (Δ $DELTA) — stopping the loop early."
+    break
+  fi
+done
+```
 
 ### 4.4 — Update metadata + report
 
 ```bash
 python3 -c "
 import json
-m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m = json.load(open('$WORK/metadata.json'))
 m['current_stage'] = 4
-json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+m['surfer_coverage_final'] = $SCORE
+m['surfer_iterations'] = $ITERATION
+m['surfer_score_history'] = '$SCORE_HISTORY'
+m['surfer_threshold'] = $SURFER_SCORE_THRESHOLD
+json.dump(m, open('$WORK/metadata.json', 'w'), indent=2)
 "
 
-echo "
-✓ Stage 4 complete
+if [ "$SCORE" -ge "$SURFER_SCORE_THRESHOLD" ]; then
+  RESULT="✓ THRESHOLD MET"
+else
+  RESULT="⚠ stopped below threshold (plateau or max iterations)"
+fi
 
-  Optimized draft saved: /tmp/celsius-skill/$SLUG/draft-optimized.md
-  Words: $OPT_WORDS
-  Ready to proceed to Stage 5 (image generation)?
+echo "
+✓ Stage 4 complete — $RESULT
+
+  Surfer term coverage: $SCORE_HISTORY  / 100  (threshold: $SURFER_SCORE_THRESHOLD)
+  Iterations:           $ITERATION
+  Optimized draft:      $WORK/draft-optimized.md
+
+  Note: this is a term-COVERAGE score against Surfer's ranking term database,
+  not the browser Content Editor score (which the API does not expose). The
+  optimized draft now covers Surfer's target terms — that's what moves rankings.
 "
 ```
 
@@ -1053,40 +1119,69 @@ Auto-generated by .claude/skills/create-blog-post/SKILL.md"
 git push origin "$BRANCH" 2>&1 | tail -5
 ```
 
-### 7.5 — Poll for the preview to come live
+### 7.5 — Get the real preview URL from the Cloudflare API
+
+**Do NOT string-predict the preview URL.** Cloudflare truncates branch aliases
+to ~28 characters, so a long branch like `preview-dog-yeast-infection-home-remedy`
+becomes alias `preview-dog-yeast-infection`. Predicting the URL by substitution
+gives a 404 for any long slug. Instead, query the Cloudflare Pages API for the
+deployment's actual alias (this is robust for any slug length).
+
+Requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in `.env` (the same
+secrets the GitHub Actions deploy uses; add them to `.env` for local use).
 
 ```bash
-# Cloudflare normalizes the branch name: preview/cat-ear-mites → preview-cat-ear-mites
-CF_BRANCH=$(echo "$BRANCH" | tr '/' '-')
-PREVIEW_BASE="https://${CF_BRANCH}.deploy-celsius-herbs-dev.pages.dev"
-PREVIEW_URL="$PREVIEW_BASE/$SLUG"
+echo "Waiting for the CI build + deploy to finish, then resolving the real URL..."
+CF_BRANCH=$(echo "$BRANCH" | tr '/' '-')   # e.g. preview-dog-yeast-infection-home-remedy
+PREVIEW_URL=""
 
-echo "Waiting for preview build to complete (up to 5 min)..."
-end=$(($(date +%s) + 300))
-attempt=0
+end=$(($(date +%s) + 360))   # up to 6 min for CI build + deploy
 while [ $(date +%s) -lt $end ]; do
-  attempt=$((attempt + 1))
-  code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "$PREVIEW_URL")
-  ts=$(date +%H:%M:%S)
-  if [ "$code" = "200" ]; then
-    echo "$ts attempt $attempt — ✓ preview live ($code)"
-    break
+  # Find the newest deployment whose source branch matches CF_BRANCH and is live.
+  RESOLVED=$(curl -sS \
+    -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+    "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/deploy-celsius-herbs-dev/deployments?per_page=15" \
+    | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+cf_branch = '$CF_BRANCH'
+for dep in data.get('result', []):
+    meta = dep.get('deployment_trigger', {}).get('metadata', {})
+    if meta.get('branch') == cf_branch:
+        stage = dep.get('latest_stage', {})
+        if stage.get('name') == 'deploy' and stage.get('status') == 'success':
+            aliases = dep.get('aliases') or []
+            # Prefer the friendly preview-* alias; fall back to the hashed url.
+            url = next((a for a in aliases if a.startswith('https://')), dep.get('url',''))
+            print(url)
+            break
+")
+  if [ -n "$RESOLVED" ]; then
+    PREVIEW_URL="$RESOLVED/$SLUG"
+    # Confirm it actually serves the page
+    code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "$PREVIEW_URL")
+    if [ "$code" = "200" ]; then
+      echo "$(date +%H:%M:%S) — ✓ preview live: $PREVIEW_URL"
+      break
+    fi
   fi
-  echo "$ts attempt $attempt — still $code, waiting 15s..."
+  echo "$(date +%H:%M:%S) — build/deploy still in progress, waiting 15s..."
   sleep 15
 done
 
-if [ "$code" != "200" ]; then
+if [ -z "$PREVIEW_URL" ] || [ "$code" != "200" ]; then
   echo ""
-  echo "⚠️ Preview deploy didn't reach HTTP 200 within 5 minutes."
+  echo "⚠️ Could not resolve a live preview URL within the time budget."
   echo "    Check the GitHub Actions run:"
   echo "    https://github.com/Etherwise/celcius-herbs-blogs/actions"
-  echo ""
-  echo "    If the workflow succeeded but the URL is wrong, Cloudflare may have"
-  echo "    chosen a slightly different branch slug. Check at:"
+  echo "    And the Cloudflare deployments:"
   echo "    https://dash.cloudflare.com → Workers & Pages → deploy-celsius-herbs-dev → Deployments"
 fi
 ```
+
+(If `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` aren't in `.env`, the API
+call returns nothing — in that case fall back to the dashboard link above to grab
+the alias manually. Adding both to `.env` makes this fully automatic.)
 
 ### 7.6 — Update metadata + output URL
 
@@ -1124,7 +1219,9 @@ a human-approved merge to main.
 
 ### 7.7 — STOP
 
-The skill ends. Do not auto-merge to main. Do not invoke other skills. Wait for the human review/merge cycle.
+The skill ends here. The preview URL is ready for human review. Do NOT auto-merge
+to main. The user (or Dr. Alex) reviews the preview, and merges the
+`preview/<slug>` branch to main when approved — production deploys automatically.
 
 ---
 
