@@ -161,7 +161,7 @@ The framework includes a **Claude Code skill** that automates the whole blog cre
 
 > "Use create-blog-post to write a post about cat ear mites"
 
-…and the skill runs through 8 stages, **fully automatically**: keyword research → content research → drafting → image generation → file scaffolding → preview deploy → SurferSEO audit + auto-revision loop. No manual steps — you just review the finished preview URL.
+…and the skill runs through 8 stages, **fully automatically**: keyword research → content research → drafting → SurferSEO term optimization → image generation → file scaffolding → preview deploy. No manual steps — you just review the finished preview URL.
 
 ### One-time setup (5 minutes)
 
@@ -177,16 +177,19 @@ You need 3 API keys (Ahrefs is already configured from the existing setup).
 - Pay-as-you-go, ~$0.10–0.20 per blog post (5 images)
 - The skill uses `gemini-3.1-flash-image-preview` (a.k.a. NanoBanana)
 
-**3. SurferSEO API key** — automated SEO scoring + revision loop
+**3. SurferSEO API key** — automated term optimization
 - In Surfer: app.surferseo.com → Settings → API (needs a Surfer plan with API access)
-- Counts against your Surfer audit quota (~1 audit per revision round)
+- ~1 Content Editor query per post (the revision loop re-scores locally — no extra Surfer calls)
 
 **4. Add them to `.env`** (next to the existing Shopify keys):
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
 GEMINI_API_KEY=AIza...
 SURFER_API_KEY=...
+CLOUDFLARE_API_TOKEN=cfut_...
+CLOUDFLARE_ACCOUNT_ID=...
 ```
+(The two Cloudflare values are the same ones in your GitHub Actions secrets — the skill uses them to resolve the real preview URL after deploy.)
 
 **5. Install Pillow** (Python library — used for JPEG→WebP conversion in the image stage):
 ```bash
@@ -200,9 +203,9 @@ That's it. Restart Claude Code if it was open, then trigger the skill.
 | Stage | Who | Time |
 |---|---|---|
 | Stages 1–3 (research + draft) | Skill | ~3–5 min |
-| Stages 4–6 (images + scaffold + preview deploy) | Skill | ~5–8 min |
-| Stage 7 (Surfer audit + auto-revision loop) | Skill | ~2–12 min |
-| **Total per post** | | **~10–20 minutes, hands-off** |
+| Stage 4 (Surfer term optimization) | Skill | ~2–6 min |
+| Stages 5–7 (images + scaffold + preview deploy) | Skill | ~5–8 min |
+| **Total per post** | | **~12–20 minutes, hands-off** |
 
 Compare to the ~13 hours the first cat-ear-infection post took manually.
 
