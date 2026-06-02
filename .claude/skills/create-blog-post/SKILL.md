@@ -1170,15 +1170,20 @@ fi
 
 ## Stage 8 — Surfer Audit + Revision Loop (automated mode only)
 
-Runs only when `SURFER_API_KEY` is set in `.env`. Audits the live preview URL, reads the content score, and if it's below threshold, asks Claude to revise the draft and re-deploys once.
+Runs only when `SURFER_API_KEY` is set in `.env`. Audits the live preview URL, reads the content score, and if it's below threshold, asks Claude to revise the draft and re-deploys — looping until the threshold is met or guardrails fire.
 
-**Threshold:** 70 by default. Configurable via `SURFER_SCORE_THRESHOLD` env var.
-**Max revisions:** 1 (to cap runtime + API spend). If after 1 revision the score is still below threshold, the skill outputs the score and stops — user can iterate manually.
+**Threshold:** 80 by default. Configurable via `SURFER_SCORE_THRESHOLD` env var.
+**Max iterations:** 4 by default. Configurable via `SURFER_MAX_ITERATIONS`. Each iteration = revise → re-scaffold → re-deploy → re-audit (~3–4 minutes).
+**Early-stop guardrail:** if a revision improves the score by less than 2 points compared to the previous iteration, the loop stops — usually means we've hit the natural ceiling for that draft. Saves API credits + time.
+**Hard time cap:** 20 minutes total wall-clock for Stage 8. After that the loop exits with whatever the latest score is.
 
-### 8.1 — Trigger an audit for the preview URL
+### 8.1 — Trigger the first audit for the preview URL
 
 ```bash
-SURFER_SCORE_THRESHOLD="${SURFER_SCORE_THRESHOLD:-70}"
+SURFER_SCORE_THRESHOLD="${SURFER_SCORE_THRESHOLD:-80}"
+SURFER_MAX_ITERATIONS="${SURFER_MAX_ITERATIONS:-4}"
+STAGE_8_DEADLINE=$(( $(date +%s) + 1200 ))   # 20-minute hard wall-clock cap
+
 PRIMARY_KEYWORD=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/research.json'))['primary_keyword'])")
 
 # Wait a moment for the deploy to fully propagate at the CF edge
@@ -1242,113 +1247,124 @@ print(score)
 echo "✓ SurferSEO content_score: $SCORE / 100 (threshold: $SURFER_SCORE_THRESHOLD)"
 ```
 
-### 8.4 — If score >= threshold: done
+### 8.4 — Score tracking + early-exit on first audit
+
+Initialize iteration state. Track every score so we can detect plateaus.
 
 ```bash
+INITIAL_SCORE="$SCORE"
+LATEST_SCORE="$SCORE"
+PREV_SCORE="$SCORE"
+ITERATION=0
+SCORE_HISTORY="$SCORE"
+
+echo "Initial Surfer score: $SCORE / 100 (threshold: $SURFER_SCORE_THRESHOLD, max iterations: $SURFER_MAX_ITERATIONS)"
+
+# Fast path — no revisions needed
 if [ "$SCORE" -ge "$SURFER_SCORE_THRESHOLD" ]; then
+  echo "✓ Initial score already meets threshold. No revisions needed."
+fi
+```
+
+### 8.5 — Revision loop (runs up to SURFER_MAX_ITERATIONS times)
+
+Repeat the block below as long as ALL of these are true:
+- `LATEST_SCORE < SURFER_SCORE_THRESHOLD`
+- `ITERATION < SURFER_MAX_ITERATIONS`
+- Wall-clock budget remaining (`date +%s < STAGE_8_DEADLINE`)
+- Last iteration moved the score by **at least 2 points** (no plateau)
+
+Each pass of the loop = one revision iteration: revise draft → re-scaffold → build → push → wait for CI → re-audit.
+
+```bash
+while [ "$LATEST_SCORE" -lt "$SURFER_SCORE_THRESHOLD" ] \
+   && [ "$ITERATION" -lt "$SURFER_MAX_ITERATIONS" ] \
+   && [ "$(date +%s)" -lt "$STAGE_8_DEADLINE" ]; do
+
+  ITERATION=$((ITERATION + 1))
+  PREV_SCORE="$LATEST_SCORE"
+
+  echo ""
+  echo "─── Iteration $ITERATION / $SURFER_MAX_ITERATIONS — previous score: $PREV_SCORE, target: $SURFER_SCORE_THRESHOLD ───"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.1 — Surface audit findings for Claude to revise against
+  # ─────────────────────────────────────────────────────────────────────
   python3 -c "
 import json
-m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
-m['current_stage'] = 8
-m['surfer_score'] = $SCORE
-m['surfer_iterations'] = 0
-json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
-"
+d = json.load(open('/tmp/celsius-skill/$SLUG/audit-${ITERATION}-pre.json' if False else '/tmp/celsius-skill/$SLUG/audit.json'))
+print(json.dumps(d, indent=2)[:4000])
+" > /tmp/celsius-skill/$SLUG/audit-context-${ITERATION}.txt
 
-  cat <<REPORT
-─────────────────────────────────────────────────────────────────────
-✓ STAGE 8 COMPLETE — SCORE PASSED
+  echo "→ Audit context written to /tmp/celsius-skill/$SLUG/audit-context-${ITERATION}.txt"
+  echo "→ Asking Claude to revise the draft (iteration $ITERATION)..."
 
-Preview URL:     $PREVIEW_URL
-SurferSEO score: $SCORE / 100  ✓ (≥ $SURFER_SCORE_THRESHOLD threshold)
-Iterations:      0
-Branch:          $BRANCH
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.2 — Claude (runtime) performs the revision:
+  #   1. Read /tmp/celsius-skill/$SLUG/draft-optimized.md (current body)
+  #   2. Read /tmp/celsius-skill/$SLUG/audit-context-${ITERATION}.txt
+  #   3. Revise body content ONLY. Do NOT touch:
+  #        - YAML frontmatter (title, description, canonical, ogImage)
+  #        - [IMAGE: ...] placeholders (must remain exact — files already exist)
+  #        - Section count / structure
+  #   4. Each iteration should attempt a DIFFERENT improvement angle:
+  #        Iteration 1 — keyword density + structural headings
+  #        Iteration 2 — semantic terms + question coverage
+  #        Iteration 3 — paragraph depth + topical breadth
+  #        Iteration 4 — final pass: anything remaining from audit suggestions
+  #   5. Save revised body OVER /tmp/celsius-skill/$SLUG/draft-optimized.md
+  # ─────────────────────────────────────────────────────────────────────
 
-NEXT STEPS (human):
-  1. Review the preview URL above
-  2. Share with Dr. Alex / your team for sign-off
-  3. Merge $BRANCH → main when approved
-─────────────────────────────────────────────────────────────────────
-REPORT
-  exit 0
-fi
-```
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.3 — Re-scaffold the 4 framework files from the revised draft
+  # (same slug, same component name, same image filenames — only body
+  # content changes)
+  # ─────────────────────────────────────────────────────────────────────
+  echo "→ Re-scaffolding files with revised draft..."
+  # (Claude executes Stage 6's file-write steps again here.)
 
-### 8.5 — If score below threshold: ask Claude to revise (one iteration only)
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.4 — Build validation
+  # ─────────────────────────────────────────────────────────────────────
+  npm run build 2>&1 | tee /tmp/celsius-skill/$SLUG/build-iter-${ITERATION}.log
+  BUILD_EXIT=${PIPESTATUS[0]}
+  if [ "$BUILD_EXIT" -ne 0 ]; then
+    echo "❌ Build failed on iteration $ITERATION — stopping the loop."
+    echo "   See /tmp/celsius-skill/$SLUG/build-iter-${ITERATION}.log"
+    echo "   Previous successful deploy still live at: $PREVIEW_URL (score: $PREV_SCORE)"
+    break
+  fi
 
-When the score is below threshold, ask Claude to do a focused revision. Read the audit details for guidance:
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.5 — Commit + push the revision to the same preview branch
+  # ─────────────────────────────────────────────────────────────────────
+  git add \
+    src/pages/$SLUG.astro \
+    src/views/blog/$COMPONENT_NAME.tsx \
+    src/lib/blog/$SLUG-faqs.ts
 
-```bash
-python3 -c "
-import json
-d = json.load(open('/tmp/celsius-skill/$SLUG/audit.json'))
-# Surface anything useful from the audit response for the revision prompt
-print(json.dumps(d, indent=2)[:2000])
-" > /tmp/celsius-skill/$SLUG/audit-context.txt
+  git commit -m "blog: revise '$SLUG' (Surfer iteration $ITERATION)
 
-echo "→ Score $SCORE is below threshold $SURFER_SCORE_THRESHOLD. Asking Claude to revise the draft."
-```
-
-Now Claude (the runtime) does the revision work:
-
-1. Read `/tmp/celsius-skill/$SLUG/draft-optimized.md` (the current draft on the preview)
-2. Read `/tmp/celsius-skill/$SLUG/audit-context.txt` (the Surfer audit response)
-3. Revise the draft — focus on what Surfer flagged, but ONLY revise the body content. Do NOT touch:
-   - The YAML frontmatter (title, description, canonical, ogImage)
-   - The `[IMAGE: ...]` placeholders (Stage 5 already generated images on those filenames)
-   - The FAQ count (Stage 6 already scaffolded the FAQs)
-4. Save the revised draft over `draft-optimized.md`
-
-### 8.6 — Re-scaffold + re-deploy (revision iteration)
-
-Re-run Stage 6's scaffolding logic with the revised draft, then commit + push to the same preview branch:
-
-```bash
-# Re-generate the 4 files using the revised draft-optimized.md (call out
-# to Stage 6's logic with the same parameters; the slug/component/imports
-# all stay identical so the files just get OVERWRITTEN with revised content).
-echo "→ Re-scaffolding files with revised draft..."
-# (Claude executes Stage 6 file-write steps again here — same slug, same
-# component name, same image filenames. Only the body content changes.)
-
-# Re-run the build to validate the revision compiles
-npm run build 2>&1 | tee /tmp/celsius-skill/$SLUG/build-revision.log
-BUILD_EXIT=${PIPESTATUS[0]}
-if [ "$BUILD_EXIT" -ne 0 ]; then
-  echo "❌ Build failed after revision — keeping the original preview deploy."
-  echo "   See /tmp/celsius-skill/$SLUG/build-revision.log"
-  echo "   Original preview URL is unchanged: $PREVIEW_URL (score: $SCORE)"
-  exit 0
-fi
-
-# Commit + push the revision to the existing preview branch
-git add \
-  src/pages/$SLUG.astro \
-  src/views/blog/$COMPONENT_NAME.tsx \
-  src/lib/blog/$SLUG-faqs.ts
-
-git commit -m "blog: revise '$SLUG' (Surfer score iteration 1)
-
-Previous Surfer score: $SCORE / 100
-Threshold: $SURFER_SCORE_THRESHOLD
+Previous Surfer score: $PREV_SCORE / 100
+Threshold:            $SURFER_SCORE_THRESHOLD
+Iteration:            $ITERATION / $SURFER_MAX_ITERATIONS
 
 Auto-revised by Stage 8 of create-blog-post skill."
 
-git push origin "$BRANCH" 2>&1 | tail -3
+  git push origin "$BRANCH" 2>&1 | tail -3
 
-echo "✓ Revision pushed. Waiting 90s for CI redeploy..."
-sleep 90
-```
+  echo "✓ Iteration $ITERATION pushed. Waiting 90s for CI redeploy..."
+  sleep 90
 
-### 8.7 — Re-audit one final time
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.6 — Re-audit
+  # ─────────────────────────────────────────────────────────────────────
+  echo "→ Submitting audit $((ITERATION + 1))..."
 
-```bash
-echo "→ Submitting second audit..."
-
-AUDIT_RESP_2=$(curl -sS -X POST "https://app.surferseo.com/api/v1/audits" \
-  -H "Content-Type: application/json" \
-  -H "API-KEY: $SURFER_API_KEY" \
-  -d "$(python3 -c "
+  AUDIT_RESP_N=$(curl -sS -X POST "https://app.surferseo.com/api/v1/audits" \
+    -H "Content-Type: application/json" \
+    -H "API-KEY: $SURFER_API_KEY" \
+    -d "$(python3 -c "
 import json
 print(json.dumps({
   'url': '$PREVIEW_URL',
@@ -1357,66 +1373,92 @@ print(json.dumps({
 }))
 ")")
 
-AUDIT_ID_2=$(echo "$AUDIT_RESP_2" | python3 -c "import json, sys; print(json.load(sys.stdin).get('id', ''))")
+  AUDIT_ID_N=$(echo "$AUDIT_RESP_N" | python3 -c "import json, sys; print(json.load(sys.stdin).get('id', ''))")
 
-end=$(($(date +%s) + 240))
-while [ $(date +%s) -lt $end ]; do
-  curl -sS -H "API-KEY: $SURFER_API_KEY" \
-    "https://app.surferseo.com/api/v1/audits/$AUDIT_ID_2" \
-    -o /tmp/celsius-skill/$SLUG/audit-2.json --max-time 30
-
-  STATE=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/audit-2.json')).get('state', '?'))")
-  echo "  $(date +%H:%M:%S) state: $STATE"
-
-  if [ "$STATE" = "completed" ] || [ "$STATE" = "failed" ]; then
+  if [ -z "$AUDIT_ID_N" ]; then
+    echo "⚠ Audit submission failed — keeping last successful score ($LATEST_SCORE) and exiting loop."
     break
   fi
-  sleep 15
-done
 
-SCORE_2=$(python3 -c "
+  # Poll
+  poll_end=$(($(date +%s) + 240))
+  while [ $(date +%s) -lt $poll_end ]; do
+    curl -sS -H "API-KEY: $SURFER_API_KEY" \
+      "https://app.surferseo.com/api/v1/audits/$AUDIT_ID_N" \
+      -o /tmp/celsius-skill/$SLUG/audit-${ITERATION}.json --max-time 30
+    STATE=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/audit-${ITERATION}.json')).get('state', '?'))")
+    echo "  $(date +%H:%M:%S) state: $STATE"
+    if [ "$STATE" = "completed" ] || [ "$STATE" = "failed" ]; then break; fi
+    sleep 15
+  done
+
+  LATEST_SCORE=$(python3 -c "
 import json
-d = json.load(open('/tmp/celsius-skill/$SLUG/audit-2.json'))
+d = json.load(open('/tmp/celsius-skill/$SLUG/audit-${ITERATION}.json'))
 print(d.get('audited_page', {}).get('content_score', 0))
 ")
 
-echo "✓ Iteration 1 score: $SCORE_2 / 100 (was: $SCORE)"
+  SCORE_HISTORY="$SCORE_HISTORY → $LATEST_SCORE"
+
+  echo "✓ Iteration $ITERATION score: $LATEST_SCORE / 100 (was: $PREV_SCORE; movement: $((LATEST_SCORE - PREV_SCORE)))"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # 8.5.7 — Early-stop guardrail: plateau detection
+  # ─────────────────────────────────────────────────────────────────────
+  if [ "$ITERATION" -ge 2 ]; then
+    DELTA=$((LATEST_SCORE - PREV_SCORE))
+    if [ "$DELTA" -lt 2 ] && [ "$DELTA" -gt -2 ]; then
+      echo "⚠ Plateau detected (score moved $DELTA points). Exiting loop early to save credits."
+      break
+    fi
+  fi
+done
 ```
 
-### 8.8 — Final report
+### 8.6 — Final report
 
 ```bash
+# Determine outcome label
+if [ "$LATEST_SCORE" -ge "$SURFER_SCORE_THRESHOLD" ]; then
+  RESULT="✓ THRESHOLD MET"
+elif [ "$ITERATION" -ge "$SURFER_MAX_ITERATIONS" ]; then
+  RESULT="⚠ MAX ITERATIONS REACHED — final score $LATEST_SCORE (target $SURFER_SCORE_THRESHOLD)"
+elif [ "$(date +%s)" -ge "$STAGE_8_DEADLINE" ]; then
+  RESULT="⚠ TIME BUDGET EXHAUSTED — final score $LATEST_SCORE (target $SURFER_SCORE_THRESHOLD)"
+else
+  RESULT="⚠ PLATEAU OR BUILD FAILURE — final score $LATEST_SCORE (target $SURFER_SCORE_THRESHOLD)"
+fi
+
+# Update metadata
 python3 -c "
 import json
 m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
 m['current_stage'] = 8
-m['surfer_score_initial'] = $SCORE
-m['surfer_score_final'] = $SCORE_2
-m['surfer_iterations'] = 1
+m['surfer_score_initial'] = $INITIAL_SCORE
+m['surfer_score_final'] = $LATEST_SCORE
+m['surfer_iterations'] = $ITERATION
 m['surfer_threshold'] = $SURFER_SCORE_THRESHOLD
+m['surfer_max_iterations'] = $SURFER_MAX_ITERATIONS
+m['surfer_score_history'] = '$SCORE_HISTORY'
 json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
 "
-
-if [ "$SCORE_2" -ge "$SURFER_SCORE_THRESHOLD" ]; then
-  RESULT="✓ THRESHOLD MET after 1 revision"
-else
-  RESULT="⚠ STILL BELOW THRESHOLD after 1 revision (manual iteration may improve further)"
-fi
 
 cat <<REPORT
 ─────────────────────────────────────────────────────────────────────
 ✓ STAGE 8 COMPLETE — $RESULT
 
-Preview URL:     $PREVIEW_URL
-SurferSEO score: $SCORE → $SCORE_2 / 100  (threshold: $SURFER_SCORE_THRESHOLD)
-Iterations:      1
-Branch:          $BRANCH
+Preview URL:        $PREVIEW_URL
+SurferSEO score:    $SCORE_HISTORY  (threshold: $SURFER_SCORE_THRESHOLD)
+Iterations:         $ITERATION / $SURFER_MAX_ITERATIONS
+Branch:             $BRANCH
 
 NEXT STEPS (human):
   1. Review the preview URL above
   2. Share with Dr. Alex / your team for sign-off
-  3. If you want to push the score higher: edit src/views/blog/${COMPONENT_NAME}.tsx,
-     push to the same branch — same URL re-deploys and you can re-audit manually
+  3. If you want to push the score higher: edit
+     src/views/blog/${COMPONENT_NAME}.tsx,
+     push to the same branch — same URL re-deploys and you can
+     re-trigger Stage 8 manually
   4. Merge $BRANCH → main when approved
 ─────────────────────────────────────────────────────────────────────
 REPORT
