@@ -1,25 +1,26 @@
 ---
 name: create-blog-post
-description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, image generation, file scaffolding, and preview deploy. Pauses once for the user to optimize the draft in SurferSEO manually.
+description: Scaffold and deploy a new Celsius Herbs blog post end-to-end. Use when the user wants to create, add, scaffold, write, or generate a new blog post or blog article in this Astro framework. Runs keyword research, content research, drafting, image generation, file scaffolding, preview deploy, and automated SurferSEO scoring with revision loop. Fully hands-off when SURFER_API_KEY is configured; otherwise falls back to manual Surfer pause.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, mcp__ahrefs__keywords-explorer-overview, mcp__ahrefs__keywords-explorer-matching-terms, mcp__ahrefs__subscription-info-limits-and-usage
 ---
 
 # Create Celsius Herbs Blog Post
 
-Walks the user through a 7-stage pipeline that produces a fully-optimized, image-rich blog post and deploys it to a Cloudflare Pages preview URL for human review.
+Walks the user through an 8-stage pipeline that produces a fully-optimized, image-rich blog post, deploys it to a Cloudflare Pages preview URL, and auto-scores it through SurferSEO (with a revision loop) before handing back for human review.
 
 ## Stages
 
-0. **Pre-flight validation** — env keys, Ahrefs MCP, working directory
+0. **Pre-flight validation** — env keys, Ahrefs MCP, working directory, optional Surfer key
 1. **Keyword research** — Ahrefs MCP
 2. **Content research** — OpenRouter → Perplexity (sonar-pro)
 3. **Draft article** — Claude writes the article (no external API)
-4. **PAUSE — SurferSEO** — user runs the draft through Surfer manually, pastes optimized version back
+4. **SurferSEO** — automated when `SURFER_API_KEY` is set (see Stage 8); falls back to manual paste-and-resume when not set
 5. **Image generation** — 5 brand-consistent images via Gemini 3.1 Flash Image Preview (NanoBanana)
 6. **Scaffold framework files** — 4 files into the Astro framework + 8 hard guarantees
-7. **Deploy preview URL** — push `preview/<slug>` branch, output Cloudflare URL, STOP
+7. **Deploy preview URL** — push `preview/<slug>` branch, output Cloudflare URL
+8. **Surfer audit + optional revision loop** — only runs when `SURFER_API_KEY` is configured. Audits the preview URL, reads the `content_score`, and if below threshold (default 70) asks Claude to revise the draft, re-deploys, and re-audits once. Outputs the final preview URL + score. STOP.
 
-The skill never auto-publishes. Stage 7 stops at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
+The skill never auto-publishes. Stages 7–8 always stop at a preview URL for human review (Dr. Alex / Rick's team) before any production merge.
 
 ## Working directory
 
@@ -35,10 +36,11 @@ Every run uses `/tmp/celsius-skill/<topic-slug>/` to stage intermediate outputs.
 
 ## Cost expectations per run
 
-- Stage 1 Ahrefs: ~50-100 units against Rick's MCP quota
+- Stage 1 Ahrefs: ~50-100 units against the configured Ahrefs MCP quota
 - Stage 2 Perplexity (via OpenRouter): ~$0.01–0.05
 - Stage 5 Gemini (5 images): ~$0.10–0.20
-- **Total per blog post: ~$0.15–0.30**
+- Stage 8 SurferSEO audit: counts against the Surfer plan's API quota (~1–2 audit units per run; one additional if the revision loop fires)
+- **Total per blog post: ~$0.15–0.30** in pay-as-you-go costs + Surfer plan usage
 
 [Stage details below — each section is a step the skill must execute in order.]
 
@@ -84,7 +86,17 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "✓ env keys loaded (2 required keys present)"
+# Optional Surfer key — when set, Stage 4's manual pause is skipped and Stage 8
+# (automated Surfer audit + revision loop) runs after deploy. When absent, the
+# original manual workflow is used.
+if [ -n "$SURFER_API_KEY" ] && [[ "$SURFER_API_KEY" != *"your_"*"_here" ]]; then
+  SURFER_MODE="automated"
+  echo "✓ env keys loaded (2 required + SURFER_API_KEY → Surfer is AUTOMATED via Stage 8)"
+else
+  SURFER_MODE="manual"
+  echo "✓ env keys loaded (2 required; no SURFER_API_KEY → Stage 4 will pause for manual Surfer pass)"
+fi
+export SURFER_MODE
 ```
 
 If this exits non-zero, STOP the skill. Tell the user the missing key(s) and instruct them to fix `.env`, then re-run.
@@ -485,9 +497,29 @@ echo "
 
 ---
 
-## Stage 4 — PAUSE for SurferSEO
+## Stage 4 — SurferSEO (conditional)
 
-This is a **manual checkpoint**. The skill stops execution and waits for the user.
+### 4.0 — Branch on SURFER_MODE
+
+```bash
+if [ "$SURFER_MODE" = "automated" ]; then
+  echo "⚡ Stage 4 skipped — Surfer integration is automated (will run in Stage 8 after deploy)"
+  # Use the un-Surfered draft as the optimized version; Stage 8 handles scoring.
+  cp /tmp/celsius-skill/$SLUG/draft.md /tmp/celsius-skill/$SLUG/draft-optimized.md
+  echo "✓ draft.md → draft-optimized.md (passthrough)"
+  echo "✓ Stage 4 complete (auto-skipped)"
+  # Skip the rest of Stage 4. Proceed directly to Stage 5.
+else
+  echo "🤚 Stage 4: SurferSEO manual pause (SURFER_API_KEY not configured)"
+  # Continue below for manual flow.
+fi
+```
+
+If `SURFER_MODE=automated`, jump to Stage 5. Otherwise continue with the manual pause described below.
+
+### 4.1 — (manual mode only) Output instructions to the user
+
+This is a **manual checkpoint** — only reached when `SURFER_API_KEY` is not set. The skill stops execution and waits for the user.
 
 ### 4.1 — Output instructions to the user
 
@@ -1122,9 +1154,277 @@ a human-approved merge to main.
 "
 ```
 
-### 7.7 — STOP
+### 7.7 — Branch on SURFER_MODE
 
-The skill ends. Do not auto-merge to main. Do not invoke other skills. Wait for the human review/merge cycle.
+```bash
+if [ "$SURFER_MODE" = "automated" ]; then
+  echo "→ Continuing to Stage 8 (Surfer audit + optional revision loop)"
+  # Don't STOP here. Stage 8 handles final stop.
+else
+  echo "✓ STOP — preview URL is ready for human review (Surfer was already handled at Stage 4 manually)"
+  exit 0
+fi
+```
+
+---
+
+## Stage 8 — Surfer Audit + Revision Loop (automated mode only)
+
+Runs only when `SURFER_API_KEY` is set in `.env`. Audits the live preview URL, reads the content score, and if it's below threshold, asks Claude to revise the draft and re-deploys once.
+
+**Threshold:** 70 by default. Configurable via `SURFER_SCORE_THRESHOLD` env var.
+**Max revisions:** 1 (to cap runtime + API spend). If after 1 revision the score is still below threshold, the skill outputs the score and stops — user can iterate manually.
+
+### 8.1 — Trigger an audit for the preview URL
+
+```bash
+SURFER_SCORE_THRESHOLD="${SURFER_SCORE_THRESHOLD:-70}"
+PRIMARY_KEYWORD=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/research.json'))['primary_keyword'])")
+
+# Wait a moment for the deploy to fully propagate at the CF edge
+sleep 30
+
+echo "→ Submitting audit for $PREVIEW_URL (keyword: '$PRIMARY_KEYWORD')..."
+
+AUDIT_RESP=$(curl -sS -X POST "https://app.surferseo.com/api/v1/audits" \
+  -H "Content-Type: application/json" \
+  -H "API-KEY: $SURFER_API_KEY" \
+  -d "$(python3 -c "
+import json
+print(json.dumps({
+  'url': '$PREVIEW_URL',
+  'keyword': '$PRIMARY_KEYWORD',
+  'location': 'United States'
+}))
+")")
+
+AUDIT_ID=$(echo "$AUDIT_RESP" | python3 -c "import json, sys; print(json.load(sys.stdin).get('id', ''))")
+
+if [ -z "$AUDIT_ID" ]; then
+  echo "❌ Failed to create Surfer audit:"
+  echo "$AUDIT_RESP"
+  echo "→ Preview URL is still live; Surfer scoring just isn't available this run."
+  exit 0
+fi
+
+echo "✓ Audit created (id=$AUDIT_ID), waiting for completion..."
+```
+
+### 8.2 — Poll the audit until completed
+
+```bash
+end=$(($(date +%s) + 240))  # up to 4 min
+while [ $(date +%s) -lt $end ]; do
+  curl -sS -H "API-KEY: $SURFER_API_KEY" \
+    "https://app.surferseo.com/api/v1/audits/$AUDIT_ID" \
+    -o /tmp/celsius-skill/$SLUG/audit.json --max-time 30
+
+  STATE=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/audit.json')).get('state', '?'))")
+  echo "  $(date +%H:%M:%S) state: $STATE"
+
+  if [ "$STATE" = "completed" ] || [ "$STATE" = "failed" ]; then
+    break
+  fi
+  sleep 15
+done
+```
+
+### 8.3 — Read the score
+
+```bash
+SCORE=$(python3 -c "
+import json
+d = json.load(open('/tmp/celsius-skill/$SLUG/audit.json'))
+score = d.get('audited_page', {}).get('content_score', 0)
+print(score)
+")
+
+echo "✓ SurferSEO content_score: $SCORE / 100 (threshold: $SURFER_SCORE_THRESHOLD)"
+```
+
+### 8.4 — If score >= threshold: done
+
+```bash
+if [ "$SCORE" -ge "$SURFER_SCORE_THRESHOLD" ]; then
+  python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 8
+m['surfer_score'] = $SCORE
+m['surfer_iterations'] = 0
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+  cat <<REPORT
+─────────────────────────────────────────────────────────────────────
+✓ STAGE 8 COMPLETE — SCORE PASSED
+
+Preview URL:     $PREVIEW_URL
+SurferSEO score: $SCORE / 100  ✓ (≥ $SURFER_SCORE_THRESHOLD threshold)
+Iterations:      0
+Branch:          $BRANCH
+
+NEXT STEPS (human):
+  1. Review the preview URL above
+  2. Share with Dr. Alex / your team for sign-off
+  3. Merge $BRANCH → main when approved
+─────────────────────────────────────────────────────────────────────
+REPORT
+  exit 0
+fi
+```
+
+### 8.5 — If score below threshold: ask Claude to revise (one iteration only)
+
+When the score is below threshold, ask Claude to do a focused revision. Read the audit details for guidance:
+
+```bash
+python3 -c "
+import json
+d = json.load(open('/tmp/celsius-skill/$SLUG/audit.json'))
+# Surface anything useful from the audit response for the revision prompt
+print(json.dumps(d, indent=2)[:2000])
+" > /tmp/celsius-skill/$SLUG/audit-context.txt
+
+echo "→ Score $SCORE is below threshold $SURFER_SCORE_THRESHOLD. Asking Claude to revise the draft."
+```
+
+Now Claude (the runtime) does the revision work:
+
+1. Read `/tmp/celsius-skill/$SLUG/draft-optimized.md` (the current draft on the preview)
+2. Read `/tmp/celsius-skill/$SLUG/audit-context.txt` (the Surfer audit response)
+3. Revise the draft — focus on what Surfer flagged, but ONLY revise the body content. Do NOT touch:
+   - The YAML frontmatter (title, description, canonical, ogImage)
+   - The `[IMAGE: ...]` placeholders (Stage 5 already generated images on those filenames)
+   - The FAQ count (Stage 6 already scaffolded the FAQs)
+4. Save the revised draft over `draft-optimized.md`
+
+### 8.6 — Re-scaffold + re-deploy (revision iteration)
+
+Re-run Stage 6's scaffolding logic with the revised draft, then commit + push to the same preview branch:
+
+```bash
+# Re-generate the 4 files using the revised draft-optimized.md (call out
+# to Stage 6's logic with the same parameters; the slug/component/imports
+# all stay identical so the files just get OVERWRITTEN with revised content).
+echo "→ Re-scaffolding files with revised draft..."
+# (Claude executes Stage 6 file-write steps again here — same slug, same
+# component name, same image filenames. Only the body content changes.)
+
+# Re-run the build to validate the revision compiles
+npm run build 2>&1 | tee /tmp/celsius-skill/$SLUG/build-revision.log
+BUILD_EXIT=${PIPESTATUS[0]}
+if [ "$BUILD_EXIT" -ne 0 ]; then
+  echo "❌ Build failed after revision — keeping the original preview deploy."
+  echo "   See /tmp/celsius-skill/$SLUG/build-revision.log"
+  echo "   Original preview URL is unchanged: $PREVIEW_URL (score: $SCORE)"
+  exit 0
+fi
+
+# Commit + push the revision to the existing preview branch
+git add \
+  src/pages/$SLUG.astro \
+  src/views/blog/$COMPONENT_NAME.tsx \
+  src/lib/blog/$SLUG-faqs.ts
+
+git commit -m "blog: revise '$SLUG' (Surfer score iteration 1)
+
+Previous Surfer score: $SCORE / 100
+Threshold: $SURFER_SCORE_THRESHOLD
+
+Auto-revised by Stage 8 of create-blog-post skill."
+
+git push origin "$BRANCH" 2>&1 | tail -3
+
+echo "✓ Revision pushed. Waiting 90s for CI redeploy..."
+sleep 90
+```
+
+### 8.7 — Re-audit one final time
+
+```bash
+echo "→ Submitting second audit..."
+
+AUDIT_RESP_2=$(curl -sS -X POST "https://app.surferseo.com/api/v1/audits" \
+  -H "Content-Type: application/json" \
+  -H "API-KEY: $SURFER_API_KEY" \
+  -d "$(python3 -c "
+import json
+print(json.dumps({
+  'url': '$PREVIEW_URL',
+  'keyword': '$PRIMARY_KEYWORD',
+  'location': 'United States'
+}))
+")")
+
+AUDIT_ID_2=$(echo "$AUDIT_RESP_2" | python3 -c "import json, sys; print(json.load(sys.stdin).get('id', ''))")
+
+end=$(($(date +%s) + 240))
+while [ $(date +%s) -lt $end ]; do
+  curl -sS -H "API-KEY: $SURFER_API_KEY" \
+    "https://app.surferseo.com/api/v1/audits/$AUDIT_ID_2" \
+    -o /tmp/celsius-skill/$SLUG/audit-2.json --max-time 30
+
+  STATE=$(python3 -c "import json; print(json.load(open('/tmp/celsius-skill/$SLUG/audit-2.json')).get('state', '?'))")
+  echo "  $(date +%H:%M:%S) state: $STATE"
+
+  if [ "$STATE" = "completed" ] || [ "$STATE" = "failed" ]; then
+    break
+  fi
+  sleep 15
+done
+
+SCORE_2=$(python3 -c "
+import json
+d = json.load(open('/tmp/celsius-skill/$SLUG/audit-2.json'))
+print(d.get('audited_page', {}).get('content_score', 0))
+")
+
+echo "✓ Iteration 1 score: $SCORE_2 / 100 (was: $SCORE)"
+```
+
+### 8.8 — Final report
+
+```bash
+python3 -c "
+import json
+m = json.load(open('/tmp/celsius-skill/$SLUG/metadata.json'))
+m['current_stage'] = 8
+m['surfer_score_initial'] = $SCORE
+m['surfer_score_final'] = $SCORE_2
+m['surfer_iterations'] = 1
+m['surfer_threshold'] = $SURFER_SCORE_THRESHOLD
+json.dump(m, open('/tmp/celsius-skill/$SLUG/metadata.json', 'w'), indent=2)
+"
+
+if [ "$SCORE_2" -ge "$SURFER_SCORE_THRESHOLD" ]; then
+  RESULT="✓ THRESHOLD MET after 1 revision"
+else
+  RESULT="⚠ STILL BELOW THRESHOLD after 1 revision (manual iteration may improve further)"
+fi
+
+cat <<REPORT
+─────────────────────────────────────────────────────────────────────
+✓ STAGE 8 COMPLETE — $RESULT
+
+Preview URL:     $PREVIEW_URL
+SurferSEO score: $SCORE → $SCORE_2 / 100  (threshold: $SURFER_SCORE_THRESHOLD)
+Iterations:      1
+Branch:          $BRANCH
+
+NEXT STEPS (human):
+  1. Review the preview URL above
+  2. Share with Dr. Alex / your team for sign-off
+  3. If you want to push the score higher: edit src/views/blog/${COMPONENT_NAME}.tsx,
+     push to the same branch — same URL re-deploys and you can re-audit manually
+  4. Merge $BRANCH → main when approved
+─────────────────────────────────────────────────────────────────────
+REPORT
+```
+
+### 8.9 — STOP
+
+Stage 8 ends. Do not auto-merge, do not re-iterate beyond once. Human reviews + merges.
 
 ---
 
