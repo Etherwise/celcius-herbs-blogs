@@ -62,7 +62,17 @@ def _api(method, path, body=None):
         f"{SURFER_BASE}{path}",
         data=data,
         method=method,
-        headers={"Content-Type": "application/json", "API-KEY": key},
+        headers={
+            "Content-Type": "application/json",
+            "API-KEY": key,
+            # Surfer's API sits behind Cloudflare's WAF, which blocks the default
+            # urllib User-Agent with HTTP 403 (error 1010). Send a browser UA.
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
