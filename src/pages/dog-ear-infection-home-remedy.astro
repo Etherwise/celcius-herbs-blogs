@@ -1,0 +1,34 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DogEarInfectionHomeRemedyGuideIsland from "../islands/blog/DogEarInfectionHomeRemedyGuide";
+import {
+  buildDogEarInfectionHomeRemedyFaqJsonLd,
+  buildDogEarInfectionHomeRemedyArticleJsonLd,
+} from "../lib/blog/dog-ear-infection-home-remedy-faqs";
+
+// Primary keyword: "dog ear infection home remedy" (Ahrefs US — vol 1,200 / KD 6 / TP 9.6k).
+// Title kept under 60 chars with primary kw in front; description 144 chars.
+//
+// Lives at blog.celsiusherbs.com/dog-ear-infection-home-remedy
+//
+// Layout.astro accepts a single JSON-LD object — wrap Article + FAQPage in a
+// schema.org @graph so both schemas ship inside one <script type="application/ld+json">.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildDogEarInfectionHomeRemedyArticleJsonLd(),
+    buildDogEarInfectionHomeRemedyFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Dog Ear Infection Home Remedy: What's Safe & What Works"
+  description="Most dog ear infection home remedies are unproven or risky. See what's safe at home, what vets warn against, and when your dog truly needs care."
+  canonical="https://blog.celsiusherbs.com/dog-ear-infection-home-remedy"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/dog-ear-infection-home-remedy.webp"
+  jsonLd={jsonLd}
+>
+  <DogEarInfectionHomeRemedyGuideIsland client:load />
+</Layout>
