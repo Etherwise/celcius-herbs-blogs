@@ -116,7 +116,7 @@ Press `Ctrl+C` in the Terminal where dev is running, then re-run `npm run dev`. 
 
 ### "I pushed to GitHub but the live site didn't update"
 
-Open https://github.com/Etherwise/celcius-herbs-blogs/actions in your browser. If you see a red X, the deploy failed — click into it for the error message. If you see a yellow circle, it's still running. Green checkmark = deployed.
+Open https://github.com/cognair/celcius-herbs-blogs/actions in your browser. If you see a red X, the deploy failed — click into it for the error message. If you see a yellow circle, it's still running. Green checkmark = deployed.
 
 ### "The instructions in `docs/ADDING-A-BLOG-POST.md` are too technical"
 
@@ -165,7 +165,7 @@ The framework includes a **Claude Code skill** that automates the whole blog cre
 
 ### One-time setup (5 minutes)
 
-You need 3 API keys (Ahrefs is already configured from the existing setup).
+You need **3 API keys** in `.env` (OpenRouter, Gemini, SurferSEO) **plus the Ahrefs MCP** configured in your own Claude Code. ⚠️ Ahrefs is *not* pre-configured for you — it's a Claude Code MCP server set up once per machine in `~/.claude.json`, separate from this repo (see the Ahrefs note below).
 
 **1. OpenRouter API key** — content research
 - Sign up: https://openrouter.ai/keys
@@ -174,12 +174,17 @@ You need 3 API keys (Ahrefs is already configured from the existing setup).
 
 **2. Gemini API key** — image generation
 - Get one: https://aistudio.google.com/apikey
-- Pay-as-you-go, ~$0.10–0.20 per blog post (5 images)
+- Pay-as-you-go — **the key's Google Cloud project must have billing active.** ⚠️ A key with a billing problem passes the startup check but fails Stage 5 with a `PERMISSION_DENIED` 403; if images fail, enable billing in Google Cloud Console.
+- ~$0.10–0.20 per blog post (5 images)
 - The skill uses `gemini-3.1-flash-image-preview` (a.k.a. NanoBanana)
 
 **3. SurferSEO API key** — automated term optimization
 - In Surfer: app.surferseo.com → Settings → API (needs a Surfer plan with API access)
 - ~1 Content Editor query per post (the revision loop re-scores locally — no extra Surfer calls)
+
+**Ahrefs MCP** — keyword research (NOT a `.env` key — a Claude Code MCP server)
+- Configured per-machine in `~/.claude.json`, so it does **not** come with this repo. Each person running the skill adds it once on their own machine, using your team's Ahrefs API key (Ahrefs subscription with API access required). Follow Ahrefs' current MCP setup instructions for the exact endpoint.
+- Stage 0 runs a free Ahrefs probe at startup; if Stage 1 can't reach Ahrefs, the MCP isn't configured.
 
 **4. Add them to `.env`** (next to the existing Shopify keys):
 ```

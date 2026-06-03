@@ -8,8 +8,8 @@
 
 - Have these tabs open in Chrome:
   1. https://blog.celsiusherbs.com/cat-ear-infection (the live blog post)
-  2. https://github.com/Etherwise/celcius-herbs-blogs (the GitHub repo)
-  3. https://github.com/Etherwise/celcius-herbs-blogs/actions (the deploy logs)
+  2. https://github.com/cognair/celcius-herbs-blogs (the GitHub repo)
+  3. https://github.com/cognair/celcius-herbs-blogs/actions (the deploy logs)
 - Have the `celsius-astrolovable` folder open in Finder
 - Have VS Code (or any editor) open with the folder loaded
 - Have a Terminal window open in the folder

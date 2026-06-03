@@ -1173,7 +1173,7 @@ if [ -z "$PREVIEW_URL" ] || [ "$code" != "200" ]; then
   echo ""
   echo "⚠️ Could not resolve a live preview URL within the time budget."
   echo "    Check the GitHub Actions run:"
-  echo "    https://github.com/Etherwise/celcius-herbs-blogs/actions"
+  echo "    https://github.com/cognair/celcius-herbs-blogs/actions"
   echo "    And the Cloudflare deployments:"
   echo "    https://dash.cloudflare.com → Workers & Pages → deploy-celsius-herbs-dev → Deployments"
 fi

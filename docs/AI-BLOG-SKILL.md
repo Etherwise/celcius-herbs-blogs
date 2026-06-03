@@ -34,7 +34,7 @@ The skill **never auto-publishes**. The final stage stops at a preview URL for h
 
 ## One-time setup (5 minutes)
 
-You need 3 API keys total. **One is already configured** (Ahrefs). The other two you'll provide.
+You need **3 API keys** added to `.env` (OpenRouter, Gemini, SurferSEO) **plus the Ahrefs MCP** wired into your Claude Code. ⚠️ On a fresh machine *none* of this is set up for you — Ahrefs in particular is a Claude Code MCP server configured per-machine in `~/.claude.json`, not something that ships with this repo. Work through every step below.
 
 ### 1. Open the framework folder in Claude Code
 
@@ -53,12 +53,17 @@ Whatever way you usually launch Claude Code — make sure it's pointed at this f
 
 **Gemini** (for the image generation):
 - Get one here: <https://aistudio.google.com/apikey>
-- Pay-as-you-go billing
+- Pay-as-you-go billing — **the key's Google Cloud project must have active billing.** ⚠️ A key without billing still *looks* valid and passes the skill's startup check, but image generation (Stage 5) fails mid-run with a `PERMISSION_DENIED` 403. If Stage 5 errors with a 403/permission message, enable billing for that project in Google Cloud Console.
 - Cost: ~$0.10–0.20 per blog post (5 images each)
 
 **SurferSEO** (for the automated term-optimization loop):
 - Get it in Surfer: app.surferseo.com → Settings → API (requires a Surfer plan with API access)
 - Cost: ~1 Content Editor query per post against your Surfer quota (the revision loop re-scores locally — no extra Surfer calls)
+
+**Ahrefs** (for keyword research) — this one is a **Claude Code MCP server**, not a `.env` key:
+- It's configured at the *user* level in `~/.claude.json`, so it does **not** travel with this repo — each person who runs the skill adds it once on their own machine.
+- Configure the Ahrefs MCP server in your Claude Code using your team's Ahrefs API key (an Ahrefs subscription with API access is required). Follow Ahrefs' current MCP setup instructions for the exact endpoint/command.
+- Verify it's live: the skill's Stage 0 runs a free Ahrefs probe at startup. If keyword research (Stage 1) can't reach Ahrefs, the MCP isn't configured.
 
 ### 3. Add the keys to `.env`
 
