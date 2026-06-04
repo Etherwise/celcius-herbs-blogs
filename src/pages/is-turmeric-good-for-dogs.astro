@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import IsTurmericGoodForDogsGuideIsland from "../islands/blog/IsTurmericGoodForDogsGuide";
+import {
+  buildIsTurmericGoodForDogsFaqJsonLd,
+  buildIsTurmericGoodForDogsArticleJsonLd,
+} from "../lib/blog/is-turmeric-good-for-dogs-faqs";
+
+// Primary keyword: "is turmeric good for dogs"
+// Lives at: blog.celsiusherbs.com/is-turmeric-good-for-dogs
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildIsTurmericGoodForDogsArticleJsonLd(),
+    buildIsTurmericGoodForDogsFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Is Turmeric Good for Dogs? Vets Weigh In"
+  description="Is turmeric good for dogs? Learn safe dosage by weight, golden paste recipe, side effects, and when vets recommend turmeric for allergies or joint pain."
+  canonical="https://blog.celsiusherbs.com/is-turmeric-good-for-dogs"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/is-turmeric-good-for-dogs.webp"
+  jsonLd={jsonLd}
+>
+  <IsTurmericGoodForDogsGuideIsland client:load />
+</Layout>
