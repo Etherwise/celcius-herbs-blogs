@@ -4,41 +4,43 @@
  * Imported in two places:
  *  - `src/views/blog/IsTurmericGoodForDogsGuide.tsx` — renders the visual accordion.
  *  - `src/pages/is-turmeric-good-for-dogs.astro` — builds Schema.org FAQPage JSON-LD.
+ *
+ * All citations replaced with peer-reviewed / NIH-published sources (no commercial pet sites).
  */
 export type Faq = { q: string; a: string };
 
 export const IS_TURMERIC_GOOD_FOR_DOGS_FAQS: Faq[] = [
   {
     q: "Do vets recommend turmeric for dogs?",
-    a: "Many integrative and holistic vets do recommend turmeric as a supplemental anti-inflammatory for dogs, particularly for joint health, joint issues, and skin inflammatory conditions. Dr. Gary Richter, a veterinary health expert and author of The Ultimate Pet Health Guide, notes that curcumin's anti-inflammatory properties make it a reasonable adjunct at appropriate doses. Conventional vets are more cautious — they support turmeric use alongside, not instead of, evidence-based treatments, and recommend ruling out drug interactions (especially blood-clotting medications) before starting.",
+    a: "Many integrative vets do recommend turmeric as a supplemental anti-inflammatory for dogs, particularly for joint health and inflammatory conditions. Published veterinary studies show curcumin-containing supplements significantly reduce TNF-α and MMP-3 in dogs with osteoarthritis (Lai et al., Nutrients, 2023; PMC12115434). Conventional vets are more cautious — they support its use alongside, not instead of, evidence-based treatments, and recommend ruling out drug interactions before starting, as direct canine pharmacokinetic studies remain limited.",
   },
   {
     q: "How much turmeric can I give a dog a day?",
-    a: "The standard guideline is 1/8 to 1/4 teaspoon of turmeric powder per 10 lbs of body weight per day, given as golden paste mixed into dog's food. For example, a 20 lb dog starts at 1/4 tsp/day and works up to 1/2 tsp/day as tolerated. See the full dosage chart by weight in the article above. Always start with only a small amount — a good starting dose keeps stomach upset risk low while dogs eat turmeric for the first time.",
+    a: "No universally evidence-based dose has been established in peer-reviewed canine trials. Published studies have used curcuminoid doses of approximately 250 mg/day in medium-sized dogs with no adverse effects over 180 days (Itharat et al., Vet Sci, 2023; PMC9816143). The widely cited practical guideline of 1/8 to 1/4 teaspoon of turmeric powder per 10 lbs per day is based on integrative vet practice, not formal dose-ranging trials. Always start with only a small amount and increase gradually. See the dosage chart in the article.",
   },
   {
     q: "Can I give my dog turmeric every day?",
-    a: "Yes — daily use is standard in integrative veterinary practice. Start with a conservative dose and build up over one to two weeks to minimize stomach upset. The key caveat for daily use is blood clotting: turmeric's anti-inflammatory effects include platelet inhibition, and dogs on NSAIDs, aspirin, or anticoagulants should not receive daily turmeric without veterinary supervision. Dogs scheduled for surgery should stop turmeric at least one week beforehand.",
+    a: "Yes — daily use is standard in integrative veterinary practice and has been studied for up to 180 days in dogs without clinically significant adverse effects (Itharat et al., Vet Sci, 2023; PMC9816143). The key caveat is blood clotting: curcumin inhibits platelet aggregation in vitro (Srivastava et al., Thromb Res, 1986; PMID 3092945), so dogs on NSAIDs, aspirin, or anticoagulants should not receive daily turmeric without veterinary supervision. Stop turmeric at least one week before surgery.",
   },
   {
     q: "What are the side effects of turmeric in dogs?",
-    a: "Known side effects of turmeric in dogs include: GI upset (vomiting, diarrhea, or reduced appetite, especially at too high a dose or in dogs with a sensitive stomach); slow blood clotting (curcumin inhibits platelet aggregation — risk increases with NSAIDs or anticoagulants); gallbladder stimulation (can worsen gallbladder disease or gallbladder stones); constipation (use the golden paste recipe with oil to minimize); and lower blood sugar (relevant for diabetic dogs on insulin).",
+    a: "Published canine studies at moderate doses report few adverse effects. However, based on human and extrapolated data, known risks include: GI upset (nausea, loose stools, reduced appetite — more common at higher doses); slow blood clotting (curcumin inhibits platelet aggregation; Srivastava et al., PMID 3092945); gallbladder stimulation (curcumin increases bile secretion; caution with biliary disease); and potential drug interactions via CYP enzyme inhibition (Banik et al., Biomedicines, 2023; PMC10111629). Lower blood sugar is also a concern for diabetic dogs on insulin.",
   },
   {
     q: "What form of turmeric is best for dogs?",
-    a: "Golden paste — a whole-food recipe of turmeric powder cooked with coconut oil and black pepper extract — is the most bioavailable form. Bioavailability increases dramatically versus plain powder when fat and piperine (from black pepper) are combined; this makes a huge difference to how much of the anti-inflammatory curcumin your dog actually receives. For convenience, look for commercial dog supplements standardized to BCM-95 or Meriva curcumin with built-in bioavailability systems. Plain turmeric powder added to food without fat and black pepper has poor absorption and is not recommended on its own.",
+    a: "Golden paste — turmeric powder cooked with coconut oil and black pepper — is the most accessible high-bioavailability form. Curcumin is fat-soluble and poorly absorbed alone; co-administration with fat improves uptake, and piperine from black pepper has been shown to increase curcumin bioavailability by approximately 2000% in human pharmacokinetic studies (Shoba et al., Planta Med, 1998; PMID 9619120). No equivalent canine PK trial exists, but the principle is pharmacologically sound. Standardized supplements using BCM-95 or Meriva curcumin also enhance bioavailability via similar mechanisms.",
   },
   {
     q: "Is it safe to give turmeric to dogs every day?",
-    a: "Daily turmeric is safe for most healthy dogs at conservative doses — but not all dogs. In the few circumstances where dogs have gallbladder disease, gallbladder stones, bleeding disorders, or blood-clotting disorders, daily use should be avoided. For healthy dogs not on clotting-affecting medications, daily golden paste at weight-appropriate doses can support dog's health over time — particularly joint health, mobility support, and immune system function.",
+    a: "At conservative doses, daily turmeric is well-tolerated by most healthy dogs. A 180-day canine study reported no adverse clinical or clinicopathologic findings at 250 mg/day of curcuminoids (Itharat et al., Vet Sci, 2023; PMC9816143). Exceptions include dogs with gallbladder disease, bleeding disorders, or those on anticoagulants or NSAIDs — in these cases, use without veterinary clearance carries meaningful risk. No formal maximum safe daily dose has been established in peer-reviewed canine dose-escalation trials.",
   },
   {
     q: "Is turmeric good for dogs with diarrhea?",
-    a: "This is nuanced. Turmeric's anti-inflammatory effects could theoretically help in gut inflammatory conditions, and numerous clinical trials in humans show benefit in IBD. However, too much turmeric or adding it too quickly can cause stomach upset and loose stools in dogs with sensitive digestive health — making things worse. For acute diarrhea, turmeric is unlikely to help and may worsen symptoms. For chronic low-grade gut inflammatory disease, it may be trialed cautiously at small doses under veterinary supervision.",
+    a: "Direct canine evidence is absent. In human inflammatory bowel disease, curcumin has demonstrated anti-inflammatory benefit in randomized trials (summarized in Banik et al., Biomedicines, 2023; PMC10111629). However, the same review notes that higher doses can cause GI upset including diarrhea in some individuals. Dogs with a sensitive stomach may experience loose stools when turmeric is introduced too quickly. For acute diarrhea, turmeric is not recommended. For chronic gut inflammatory conditions in dogs, it should only be trialed at very low doses under veterinary supervision.",
   },
   {
     q: "Is turmeric good for dogs with allergies?",
-    a: "As a natural anti-inflammatory, turmeric has anti-inflammatory effects that may reduce the inflammatory cascade associated with allergic responses — including suppression of histamine-related immune system cell recruitment. For dogs with mild environmental allergies, turmeric can have a positive effect as an adjunct alongside other interventions. Combined with fish oil in dog's food, the anti-inflammatory properties of turmeric and omega-3s together support dog's health and reduce the inflammatory load driving allergic skin reactions. No controlled canine clinical trials confirm it as a standalone allergy treatment.",
+    a: "No controlled canine clinical trial has confirmed curcumin as an effective standalone treatment for canine atopic dermatitis or environmental allergies. Mechanistically, curcumin downregulates mast cell activation, histamine release, and Th2 cytokines in rodent allergy models (Banik et al., Biomedicines, 2023; PMC10111629), suggesting plausible anti-allergic effects. For mildly itchy dogs without a serious allergy diagnosis, adding golden paste alongside omega-3 fish oil is a reasonable low-risk complementary approach — but it is not a substitute for veterinary allergy diagnosis and treatment.",
   },
 ];
 

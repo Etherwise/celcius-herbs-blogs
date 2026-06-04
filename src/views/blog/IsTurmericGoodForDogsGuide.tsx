@@ -129,7 +129,7 @@ const SIDE_EFFECTS = [
 const REFERENCES = [
   "Nagy, D. et al. (2023). Curcumin supplementation in dogs — antioxidant and anti-inflammatory effects. PMC / National Library of Medicine.",
   "Purina (2022). Can Dogs Have Turmeric? Purina Pet Care Blog. purina.com.",
-  "Chewy (2024). Turmeric for Dogs: Benefits, Dosage, and Side Effects. Chewy Health Blog. chewy.com.",
+  "Banik, U. et al. (2023). Curcumin and its multifaceted role in drug interactions and bioavailability. Biomedicines, PMC10111629. National Library of Medicine.",
   "PetMD (2020). Turmeric for Dogs: Is It Safe? PetMD Editorial. petmd.com.",
   "VCA Hospitals (2020). Herbs — General Use in Pets. VCA Animal Hospitals. vcahospitals.com.",
   "AVMA (2021). Dietary Supplements for Pets — Owner Guidance. American Veterinary Medical Association. avma.org.",
@@ -137,6 +137,8 @@ const REFERENCES = [
   "Hampton Roads Vet Hospice (2018). Golden Paste Recipe for Dogs. hamptonroadsvet.com.",
   "Napa Holistic Vet (2016). Golden Paste Dosage Guidelines for Dogs. napaholisticvet.com.",
   "FutureYou Health (2023). Turmeric and Blood Sugar — Safety in Pets. futureyouhealth.com.",
+  "Srivastava, R. et al. (1986). Curcumin inhibits platelet aggregation. Thrombosis Research, PMID 3092945. National Library of Medicine.",
+  "Shoba, G. et al. (1998). Influence of piperine on the pharmacokinetics of curcumin — 2000% bioavailability increase. Planta Medica, PMID 9619120. National Library of Medicine.",
 ];
 
 function SectionLabel({ n, title }: { n: string; title: string }) {
@@ -430,7 +432,7 @@ export default function IsTurmericGoodForDogsGuide() {
                 If your dog is on NSAIDs, blood thinners, insulin, or
                 antihypertensives, check with your vet before adding turmeric
                 to dog's diet. Blood clotting drug interactions are real and
-                clinically significant. [Source: Chewy, 2024]
+                clinically significant. [Source: Banik et al., PMC10111629, 2023]
               </p>
             </div>
           </section>
@@ -526,7 +528,7 @@ export default function IsTurmericGoodForDogsGuide() {
               <p className="text-sm text-foreground/85 leading-relaxed">
                 Repeated vomiting, blood in stool, weight loss, or signs of
                 slow blood clotting (increased bruising). Dogs with bleeding
-                disorders should never receive turmeric. [Source: Chewy, 2024]
+                disorders should never receive turmeric. [Source: Srivastava et al., PMID 3092945]
               </p>
             </div>
           </section>
@@ -670,7 +672,7 @@ export default function IsTurmericGoodForDogsGuide() {
               </table>
             </div>
             <p className="text-sm text-muted-foreground italic">
-              [Source: PMC (Nagy et al.), 2023] [Source: Chewy, 2024] [Source: Purina, 2022]
+              [Source: PMC (Nagy et al.), 2023] [Source: Shoba et al., PMID 9619120, 1998] [Source: Purina, 2022]
             </p>
             <div className="mt-6 p-5 rounded-xl bg-card border border-border">
               <h3 className="font-serif text-lg text-ink-deep mb-3">
