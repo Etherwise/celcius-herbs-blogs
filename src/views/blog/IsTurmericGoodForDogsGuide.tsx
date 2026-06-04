@@ -238,7 +238,7 @@ export default function IsTurmericGoodForDogsGuide() {
               >
                 See dosage chart
               </Button>
-              <a href="/petglow-ear-cleaner">
+              <a href="https://celsiusherbs.com/products/natural-dog-ear-cleanser-infection">
                 <Button
                   size="lg"
                   variant="outline"
@@ -746,7 +746,7 @@ export default function IsTurmericGoodForDogsGuide() {
               reduce the microbial load that drives ear inflammation — a
               practical complement to any internal anti-inflammatory protocol.
             </p>
-            <a href="/petglow-ear-cleaner">
+            <a href="https://celsiusherbs.com/products/natural-dog-ear-cleanser-infection">
               <Button
                 size="lg"
                 className="rounded-full bg-primary-foreground text-ink-deep hover:bg-primary-foreground/90"
