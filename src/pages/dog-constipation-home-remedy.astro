@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DogConstipationHomeRemedyGuideIsland from "../islands/blog/DogConstipationHomeRemedyGuide";
+import {
+  buildDogConstipationHomeRemedyFaqJsonLd,
+  buildDogConstipationHomeRemedyArticleJsonLd,
+} from "../lib/blog/dog-constipation-home-remedy-faqs";
+
+// Primary keyword: "dog constipation home remedy"
+// Lives at: blog.celsiusherbs.com/dog-constipation-home-remedy
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildDogConstipationHomeRemedyArticleJsonLd(),
+    buildDogConstipationHomeRemedyFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Dog Constipation Home Remedy: 8 Safe Options with Dosages"
+  description="Dog constipation home remedy guide covering 8 safe options with dosages — pumpkin, hydration, olive oil, exercise — plus when to call the vet."
+  canonical="https://blog.celsiusherbs.com/dog-constipation-home-remedy"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/dog-constipation-home-remedy.webp"
+  jsonLd={jsonLd}
+>
+  <DogConstipationHomeRemedyGuideIsland client:load />
+</Layout>
