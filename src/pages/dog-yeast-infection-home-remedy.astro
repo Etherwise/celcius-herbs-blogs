@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DogYeastInfectionHomeRemedyGuideIsland from "../islands/blog/DogYeastInfectionHomeRemedyGuide";
+import {
+  buildDogYeastInfectionHomeRemedyFaqJsonLd,
+  buildDogYeastInfectionHomeRemedyArticleJsonLd,
+} from "../lib/blog/dog-yeast-infection-home-remedy-faqs";
+
+// Primary keyword: "dog yeast infection home remedy"
+// Lives at: blog.celsiusherbs.com/dog-yeast-infection-home-remedy
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildDogYeastInfectionHomeRemedyArticleJsonLd(),
+    buildDogYeastInfectionHomeRemedyFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Dog Yeast Infection Home Remedy: 7 Natural Treatments"
+  description="Dog yeast infection home remedy guide: ACV protocol with dilution ratios, coconut oil, turmeric, neem, antifungal diet, and prevention tips."
+  canonical="https://blog.celsiusherbs.com/dog-yeast-infection-home-remedy"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/dog-yeast-infection-home-remedy.webp"
+  jsonLd={jsonLd}
+>
+  <DogYeastInfectionHomeRemedyGuideIsland client:load />
+</Layout>
