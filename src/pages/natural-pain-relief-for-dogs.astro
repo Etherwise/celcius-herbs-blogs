@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import NaturalPainReliefForDogsGuideIsland from "../islands/blog/NaturalPainReliefForDogsGuide";
+import {
+  buildNaturalPainReliefForDogsFaqJsonLd,
+  buildNaturalPainReliefForDogsArticleJsonLd,
+} from "../lib/blog/natural-pain-relief-for-dogs-faqs";
+
+// Primary keyword: "natural pain relief for dogs"
+// Lives at: blog.celsiusherbs.com/natural-pain-relief-for-dogs
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildNaturalPainReliefForDogsArticleJsonLd(),
+    buildNaturalPainReliefForDogsFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Natural Pain Relief for Dogs: 10 Evidence-Based Remedies"
+  description="Natural pain relief for dogs: 10 research-backed herbs and supplements with PubMed citations, dosage chart by weight, drug interaction table, and FAQ."
+  canonical="https://blog.celsiusherbs.com/natural-pain-relief-for-dogs"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/natural-pain-relief-for-dogs.webp"
+  jsonLd={jsonLd}
+>
+  <NaturalPainReliefForDogsGuideIsland client:load />
+</Layout>
