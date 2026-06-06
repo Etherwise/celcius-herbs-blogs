@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CatEarInfectionPicturesGuideIsland from "../islands/blog/CatEarInfectionPicturesGuide";
+import {
+  buildCatEarInfectionPicturesFaqJsonLd,
+  buildCatEarInfectionPicturesArticleJsonLd,
+} from "../lib/blog/cat-ear-infection-pictures-faqs";
+
+// Primary keyword: "cat ear infection pictures"
+// Lives at: blog.celsiusherbs.com/cat-ear-infection-pictures
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCatEarInfectionPicturesArticleJsonLd(),
+    buildCatEarInfectionPicturesFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Cat Ear Infection Pictures: Bacterial vs Yeast Guide"
+  description="Cat ear infection pictures: bacterial vs yeast vs ear mites with real photos, discharge color chart, severity stages, and vet red-flags."
+  canonical="https://blog.celsiusherbs.com/cat-ear-infection-pictures"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/cat-ear-infection-pictures.webp"
+  jsonLd={jsonLd}
+>
+  <CatEarInfectionPicturesGuideIsland client:load />
+</Layout>
