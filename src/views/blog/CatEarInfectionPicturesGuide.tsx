@@ -32,6 +32,8 @@ import imgEarwax from "@/assets/blog/cat-ear-infection-pictures-earwax.webp";
 import imgEarMiteKitten from "@/assets/blog/cat-ear-infection-pictures-ear-mite-kitten.webp";
 import imgEarMiteInfection from "@/assets/blog/cat-ear-infection-pictures-ear-mite-infection.webp";
 import imgEarMiteMicroscope from "@/assets/blog/cat-ear-infection-pictures-ear-mite-microscope.webp";
+import imgEarMiteEndoscope from "@/assets/blog/cat-ear-infection-pictures-ear-mite-endoscope.webp";
+import imgMalasseziaCytology from "@/assets/blog/cat-ear-infection-pictures-malassezia-cytology.webp";
 
 type Section = { id: string; label: string };
 
@@ -393,6 +395,19 @@ export default function CatEarInfectionPicturesGuide() {
                 </div>
               </div>
 
+              <figure className="rounded-2xl overflow-hidden border border-border mb-6">
+                <img
+                  src={imgMalasseziaCytology.src}
+                  alt="Malassezia yeast cells under tape cytology microscopy (Dif-Quik stain) — the peanut-shaped organisms causing yeast ear infections in cats"
+                  className="w-full object-cover max-h-72"
+                  loading="lazy"
+                />
+                <figcaption className="px-4 py-3 bg-muted/30">
+                  <p className="text-sm font-medium">Malassezia yeast cells (Dif-Quik stain) — the organism behind yeast ear infections in cats</p>
+                  <PhotoCredit author="Caroldermoid" license="CC BY-SA 3.0" source="Wikimedia Commons" />
+                </figcaption>
+              </figure>
+
               <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 text-sm text-blue-900 leading-relaxed">
                 <strong>Chronic ear infections — what to watch for:</strong> When cat ear infections keep coming back, the underlying cause usually hasn't been addressed. Chronic ear infections in cats are almost always driven by autoimmune diseases, allergies, structural anatomy, or a weak immune system. Cats with immune system diseases are particularly prone to recurring yeast infections. Recurring ear infections that don't respond to standard ear drops are a signal to ask your vet for a deeper workup into environment, autoimmune diseases, allergies, and immune function. [Source: Chronic Otitis in Cats — PMC, 2023]
               </div>
@@ -449,7 +464,7 @@ export default function CatEarInfectionPicturesGuide() {
                 <strong>Important overlap:</strong> Ear mites frequently trigger secondary bacterial ear infections or yeast ear infections, so you may see coffee-ground debris <em>plus</em> odor and pus in the same ear. Cats with ear canal thick fur — like Maine Coons or Persians — are harder to assess visually because ear debris gets trapped in the hair. Infected cat ears in these breeds can look deceptively mild from outside. [Source: MSD Veterinary Manual, 2020; Chronic Otitis in Cats — PMC, 2023]
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <figure className="rounded-2xl overflow-hidden border border-border">
                   <img
                     src={imgEarMiteInfection.src}
@@ -475,6 +490,18 @@ export default function CatEarInfectionPicturesGuide() {
                   </figcaption>
                 </figure>
               </div>
+              <figure className="rounded-2xl overflow-hidden border border-border">
+                <img
+                  src={imgEarMiteEndoscope.src}
+                  alt="Endoscopic view inside a cat's ear canal showing white ear mite granules packed in orange-brown debris — what a vet sees with an otoscope"
+                  className="w-full object-cover max-h-80"
+                  loading="lazy"
+                />
+                <figcaption className="px-4 py-3 bg-muted/30">
+                  <p className="text-sm font-medium">Endoscopic view of a cat's ear canal — white mite granules visible in dark debris (what a vet sees with an otoscope)</p>
+                  <PhotoCredit author="Hanzaku" license="CC BY-SA 4.0" source="Wikimedia Commons" />
+                </figcaption>
+              </figure>
             </section>
 
             {/* Chapter 05 — Discharge guide */}
@@ -741,6 +768,8 @@ export default function CatEarInfectionPicturesGuide() {
                   <li>Kitten ear mite (Gale d'oreille chaton) — .Anja., CC BY-SA 4.0, commons.wikimedia.org/wiki/File:Gale_d%27oreille_chaton.jpg</li>
                   <li>Ear mite infection (Ohrraeude) — Uwe Gille, CC BY-SA 3.0, commons.wikimedia.org/wiki/File:Ohrraeude.jpg</li>
                   <li>Otodectes cynotis microscope — Caroldermoid, CC BY-SA 3.0, commons.wikimedia.org/wiki/File:Otodectes_cynotis.jpg</li>
+                  <li>Endoscopic view of ear mites in cat's ear canal — Hanzaku, CC BY-SA 4.0, commons.wikimedia.org/wiki/File:%D0%9A%D0%BB%D0%B5%D1%89%D0%B8_otodectes_cynotis_%D0%B2_%D0%BD%D0%B0%D1%80%D1%83%D0%B6%D0%BD%D0%BE%D0%BC_%D1%83%D1%85%D0%B5_%D0%BA%D0%BE%D1%88%D0%BA%D0%B8.jpg</li>
+                  <li>Malassezia tape cytology (Dif-Quik stain) — Caroldermoid, CC BY-SA 3.0, commons.wikimedia.org/wiki/File:Malassezia_tape_cytology.jpg</li>
                 </ul>
               </div>
             </section>
