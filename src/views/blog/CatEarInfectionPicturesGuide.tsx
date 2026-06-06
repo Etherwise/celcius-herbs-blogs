@@ -284,7 +284,7 @@ export default function CatEarInfectionPicturesGuide() {
               </div>
               <figure className="rounded-2xl overflow-hidden border border-border">
                 <img
-                  src={imgHealthyEar.src}
+                  src={imgHealthyEar}
                   alt="Healthy cat ear showing pale-pink clean inner pinna with no visible discharge or ear debris"
                   className="w-full object-cover max-h-80"
                   loading="lazy"
@@ -321,7 +321,7 @@ export default function CatEarInfectionPicturesGuide() {
               </div>
               <figure className="rounded-2xl overflow-hidden border border-border">
                 <img
-                  src={imgEarwax.src}
+                  src={imgEarwax}
                   alt="Cat ear canal showing earwax accumulation — what early mild wax buildup and ear debris looks like"
                   className="w-full object-cover max-h-72"
                   loading="lazy"
@@ -397,7 +397,7 @@ export default function CatEarInfectionPicturesGuide() {
 
               <figure className="rounded-2xl overflow-hidden border border-border mb-6">
                 <img
-                  src={imgMalasseziaCytology.src}
+                  src={imgMalasseziaCytology}
                   alt="Malassezia yeast cells under tape cytology microscopy (Dif-Quik stain) — the peanut-shaped organisms causing yeast ear infections in cats"
                   className="w-full object-cover max-h-72"
                   loading="lazy"
@@ -467,7 +467,7 @@ export default function CatEarInfectionPicturesGuide() {
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <figure className="rounded-2xl overflow-hidden border border-border">
                   <img
-                    src={imgEarMiteInfection.src}
+                    src={imgEarMiteInfection}
                     alt="Cat ear showing ear mite infestation with dark coffee-ground debris in the external ear canal"
                     className="w-full object-cover max-h-64"
                     loading="lazy"
@@ -479,7 +479,7 @@ export default function CatEarInfectionPicturesGuide() {
                 </figure>
                 <figure className="rounded-2xl overflow-hidden border border-border">
                   <img
-                    src={imgEarMiteMicroscope.src}
+                    src={imgEarMiteMicroscope}
                     alt="Microscopic image of Otodectes cynotis — the ear mites causing dark debris and ear infections in cats"
                     className="w-full object-cover max-h-64"
                     loading="lazy"
@@ -492,7 +492,7 @@ export default function CatEarInfectionPicturesGuide() {
               </div>
               <figure className="rounded-2xl overflow-hidden border border-border">
                 <img
-                  src={imgEarMiteEndoscope.src}
+                  src={imgEarMiteEndoscope}
                   alt="Endoscopic view inside a cat's ear canal showing white ear mite granules packed in orange-brown debris — what a vet sees with an otoscope"
                   className="w-full object-cover max-h-80"
                   loading="lazy"
@@ -613,7 +613,7 @@ export default function CatEarInfectionPicturesGuide() {
               </div>
               <figure className="rounded-2xl overflow-hidden border border-border mt-6">
                 <img
-                  src={imgEarMiteKitten.src}
+                  src={imgEarMiteKitten}
                   alt="Kitten's ear showing dark debris and early ear inflammation from ear mite infestation — similar visual appearance to early yeast infection debris"
                   className="w-full object-cover max-h-72"
                   loading="lazy"
