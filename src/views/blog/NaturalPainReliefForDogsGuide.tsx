@@ -691,25 +691,24 @@ export default function NaturalPainReliefForDogsGuide() {
           {/* Final CTA */}
           <section className="scroll-mt-24 bg-ink-deep text-primary-foreground rounded-3xl p-10 lg:p-14">
             <div className="text-[10px] tracking-[0.25em] uppercase text-accent mb-3">
-              Designed for chronic joint pain
+              Designed for daily comfort support
             </div>
             <h2 className="font-serif text-3xl md:text-4xl mb-4 leading-tight">
-              Natural pain relief, built into one daily chew.
+              Natural pain relief, delivered in every drop.
             </h2>
             <p className="text-primary-foreground/80 leading-relaxed max-w-xl mb-7">
-              Chronic arthritis pain in dogs responds best to a multi-modal
-              approach. Celsius Herbs' Joint Supplement for Dogs is formulated
-              with therapeutic-level boswellia, curcumin with piperine, and
-              omega-3 support in a single daily chew — designed to address the
-              inflammatory root of canine OA pain as part of your dog's
-              complete pain management plan.
+              Chronic pain in dogs responds best to a multi-modal approach.
+              PetGlow Drops are formulated with therapeutic-level herbal
+              extracts — easy to add to food or deliver directly — designed
+              to support your dog's comfort and mobility as part of a complete
+              natural pain management plan.
             </p>
-            <a href="https://celsiusherbs.com/products/joint-supplement-for-dogs">
+            <a href="https://celsiusherbs.com/products/natural-dog-ear-cleanser-infection">
               <Button
                 size="lg"
                 className="rounded-full bg-primary-foreground text-ink-deep hover:bg-primary-foreground/90"
               >
-                Explore Joint Supplement for Dogs →
+                Explore PetGlow Drops →
               </Button>
             </a>
           </section>
