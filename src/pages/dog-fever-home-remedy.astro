@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DogFeverHomeRemedyGuideIsland from "../islands/blog/DogFeverHomeRemedyGuide";
+import {
+  buildDogFeverHomeRemedyFaqJsonLd,
+  buildDogFeverHomeRemedyArticleJsonLd,
+} from "../lib/blog/dog-fever-home-remedy-faqs";
+
+// Primary keyword: "dog fever home remedy"
+// Lives at: blog.celsiusherbs.com/dog-fever-home-remedy
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildDogFeverHomeRemedyArticleJsonLd(),
+    buildDogFeverHomeRemedyFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Dog Fever Home Remedy: 5 Safe Cooling Methods"
+  description="Dog fever home remedy: normal temp 101–102.5°F, 5 safe cooling methods, how to take dog's temperature, and which human meds are toxic."
+  canonical="https://blog.celsiusherbs.com/dog-fever-home-remedy"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/dog-fever-home-remedy.webp"
+  jsonLd={jsonLd}
+>
+  <DogFeverHomeRemedyGuideIsland client:load />
+</Layout>
