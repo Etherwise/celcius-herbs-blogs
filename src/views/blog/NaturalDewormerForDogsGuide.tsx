@@ -8,7 +8,6 @@ import {
   Leaf,
   PawPrint,
   ShieldCheck,
-  Stethoscope,
   Thermometer,
   XCircle,
   Zap,
@@ -38,7 +37,6 @@ const SECTIONS: Section[] = [
   { id: "pumpkin-seeds", label: "Pumpkin seed dosage" },
   { id: "evidence-ratings", label: "Evidence ratings" },
   { id: "ayurvedic", label: "Ayurvedic herbs" },
-  { id: "conventional", label: "Conventional dewormers" },
   { id: "faq", label: "FAQs" },
   { id: "references", label: "References" },
 ];
@@ -54,13 +52,6 @@ const EVIDENCE_ROWS = [
   { remedy: "Apple cider vinegar", grade: "None", safe: "caution", notes: "GI irritant; no deworming evidence" },
   { remedy: "Neem", grade: "Moderate (livestock/lab)", safe: "caution", notes: "Best for ectoparasites; oral use unestablished" },
   { remedy: "Vidanga (embelin)", grade: "Weak (rodent)", safe: "caution", notes: "Ayurvedic; promising in vitro only" },
-];
-
-const CONVENTIONAL_ROWS = [
-  { drug: "Pyrantel pamoate", worms: "Roundworms, hookworms", evidence: "Strong — FDA-approved", notes: "OTC; safe for puppies 2+ weeks" },
-  { drug: "Fenbendazole (Panacur)", worms: "Roundworms, hookworms, whipworms, Giardia", evidence: "Strong — FDA-approved", notes: "3-day course; very well tolerated" },
-  { drug: "Praziquantel", worms: "Tapeworms", evidence: "Strong — FDA-approved", notes: "Often combined with pyrantel" },
-  { drug: "Milbemycin oxime", worms: "Roundworms, hookworms, whipworms + heartworm", evidence: "Strong — FDA-approved", notes: "Monthly preventive" },
 ];
 
 const REFERENCES = [
@@ -247,7 +238,7 @@ export default function NaturalDewormerForDogsGuide() {
                 <img
                   src={imgWormTypes}
                   alt="Four types of dog intestinal worms — roundworm, hookworm, tapeworm, whipworm educational diagram"
-                  className="w-full object-cover max-h-72"
+                  className="w-full object-contain"
                   loading="lazy"
                 />
                 <figcaption className="px-4 py-3 bg-muted/30">
@@ -574,88 +565,30 @@ export default function NaturalDewormerForDogsGuide() {
               </div>
             </section>
 
-            {/* Chapter 07 — Conventional */}
-            <section id="conventional" className="scroll-mt-24">
-              <SectionLabel n="07" title="When Conventional Dewormers Are Needed" />
-              <div className="rounded-2xl overflow-hidden border border-border mb-6">
-                <div className="bg-muted/40 px-5 py-3 flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4 text-primary" />
-                  <span className="font-semibold text-sm">Conventional Dewormers vs Natural Worm Treatments</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 font-semibold text-muted-foreground">Drug</th>
-                        <th className="text-left p-3 font-semibold text-muted-foreground">Worms covered</th>
-                        <th className="text-left p-3 font-semibold text-muted-foreground">Evidence</th>
-                        <th className="text-left p-3 font-semibold text-muted-foreground hidden md:table-cell">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {CONVENTIONAL_ROWS.map((row, i) => (
-                        <tr key={row.drug} className={i % 2 === 0 ? "bg-muted/20" : ""}>
-                          <td className="p-3 font-medium">{row.drug}</td>
-                          <td className="p-3 text-muted-foreground">{row.worms}</td>
-                          <td className="p-3"><EvidenceBadge grade={row.evidence} /></td>
-                          <td className="p-3 text-muted-foreground hidden md:table-cell">{row.notes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="px-5 py-3 text-xs text-muted-foreground border-t border-border">
-                  [Source: MSD Veterinary Manual, 2020; CAPC, 2022]
-                </p>
+            {/* CTA */}
+            <section className="bg-ink-deep text-primary-foreground rounded-3xl p-10 lg:p-14">
+              <div className="text-[10px] tracking-[0.25em] uppercase text-accent mb-3">
+                Herbal gut support
               </div>
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
-                <p className="font-semibold text-sm text-red-800 mb-3">Use conventional dewormers without hesitation when:</p>
-                <ul className="space-y-1.5">
-                  {[
-                    "Any puppy under 12 weeks — natural worm treatments carry unacceptable risk at this age",
-                    "Hookworm with pale gums or anemia — a life-threatening worm infestation requiring immediate treatment",
-                    "Heavy worm burden: visible worms in vomit, multiple tapeworm segments per day, or significant weight loss",
-                    "Whipworm confirmed on fecal test — no natural dewormer has any meaningful evidence against whipworms",
-                    "Worm infestation in pregnant dogs or lactating dogs — pregnant or lactating dogs must use vet-prescribed drugs",
-                    "Tapeworm from fleas — requires flea control alongside deworming; no herbal remedy addresses the flea lifecycle",
-                    "Immune system compromise or immunosuppressive medication",
-                  ].map((item) => (
-                    <li key={item} className="flex gap-2 text-sm text-red-900">
-                      <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The efficacy gap is not close: pyrantel pamoate achieves {">"}90% clearance of roundworms and hookworms in a single dose. Pumpkin seeds — the best natural dewormer for dogs — has no controlled clinical trial confirming efficacy. Natural worm treatments may complement a deworming protocol. To prevent worms from recurring, a holistic vet can help dog owners address immune system health, healthy diet, and environmental contamination as part of a complete natural worm prevention strategy. [Source: CAPC, 2022; MSD Veterinary Manual, 2020]
+              <h2 className="font-serif text-3xl md:text-4xl mb-4 leading-tight">
+                Support your dog's digestive health year-round.
+              </h2>
+              <p className="text-primary-foreground/80 leading-relaxed max-w-xl mb-7">
+                A proper deworming protocol starts with knowing what you're treating. While your vet handles the diagnosis and prescription, PetGlow Drops can support your dog's digestive system and immune system as part of a daily wellness routine — before, during, and after deworming.
               </p>
-
-              {/* CTA */}
-              <section className="bg-ink-deep text-primary-foreground rounded-3xl p-10 lg:p-14 mt-10">
-                <div className="text-[10px] tracking-[0.25em] uppercase text-accent mb-3">
-                  Herbal gut support
-                </div>
-                <h2 className="font-serif text-3xl md:text-4xl mb-4 leading-tight">
-                  Support your dog's digestive health year-round.
-                </h2>
-                <p className="text-primary-foreground/80 leading-relaxed max-w-xl mb-7">
-                  A proper deworming protocol starts with knowing what you're treating. While your vet handles the diagnosis and prescription, PetGlow Drops can support your dog's digestive system and immune system as part of a daily wellness routine — before, during, and after deworming.
-                </p>
-                <a href="https://celsiusherbs.com/products/petglow-drops">
-                  <Button
-                    size="lg"
-                    className="rounded-full bg-primary-foreground text-ink-deep hover:bg-primary-foreground/90"
-                  >
-                    Explore PetGlow Drops for Dogs →
-                  </Button>
-                </a>
-              </section>
+              <a href="https://celsiusherbs.com/products/petglow-drops">
+                <Button
+                  size="lg"
+                  className="rounded-full bg-primary-foreground text-ink-deep hover:bg-primary-foreground/90"
+                >
+                  Explore PetGlow Drops for Dogs →
+                </Button>
+              </a>
             </section>
 
             {/* FAQ */}
             <section id="faq" className="scroll-mt-24">
-              <SectionLabel n="08" title="Frequently Asked Questions" />
+              <SectionLabel n="07" title="Frequently Asked Questions" />
               <Accordion type="single" collapsible className="space-y-3">
                 {FAQS.map((faq, i) => (
                   <AccordionItem
@@ -679,7 +612,7 @@ export default function NaturalDewormerForDogsGuide() {
 
             {/* References */}
             <section id="references" className="scroll-mt-24">
-              <SectionLabel n="09" title="References" />
+              <SectionLabel n="08" title="References" />
               <ol className="space-y-2">
                 {REFERENCES.map((ref, i) => (
                   <li key={i} className="flex gap-3 text-sm text-muted-foreground">
