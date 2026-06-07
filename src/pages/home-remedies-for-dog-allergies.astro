@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import HomeRemediesForDogAllergiesGuideIsland from "../islands/blog/HomeRemediesForDogAllergiesGuide";
+import {
+  buildHomeRemediesForDogAllergiesFaqJsonLd,
+  buildHomeRemediesForDogAllergiesArticleJsonLd,
+} from "../lib/blog/home-remedies-for-dog-allergies-faqs";
+
+// Primary keyword: "home remedies for dog allergies"
+// Lives at: blog.celsiusherbs.com/home-remedies-for-dog-allergies
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildHomeRemediesForDogAllergiesArticleJsonLd(),
+    buildHomeRemediesForDogAllergiesFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Home Remedies for Dog Allergies: 12 Ranked Treatments"
+  description="Home remedies for dog allergies: 12 evidence-rated treatments including oatmeal baths, quercetin dosing, fish oil, and elimination diet guide."
+  canonical="https://blog.celsiusherbs.com/home-remedies-for-dog-allergies"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/home-remedies-for-dog-allergies.webp"
+  jsonLd={jsonLd}
+>
+  <HomeRemediesForDogAllergiesGuideIsland client:load />
+</Layout>
