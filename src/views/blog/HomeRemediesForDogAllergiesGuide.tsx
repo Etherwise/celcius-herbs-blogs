@@ -765,13 +765,14 @@ export default function HomeRemediesForDogAllergiesGuide() {
         <h2 className="mb-2 text-xl font-bold">Support Your Dog's Skin from the Inside Out</h2>
         <p className="mb-5 text-sm leading-relaxed text-[#5C4F44]">
           Managing a dog's allergies takes patience. Celsius Herbs{" "}
-          <strong>PetGlow Drops</strong> combine omega 3 fatty acids from fish oil, turmeric
-          curcumin, and a targeted herbal blend designed to reduce inflammation and support healthy
-          skin in dogs with chronic allergies — formulated with veterinary input.
+          <strong>PetGlow Flea &amp; Tick Treatment Drops</strong> offer a natural, plant-based
+          approach to flea allergy dermatitis — one of the most common triggers of chronic itch and
+          irritated skin in dogs — formulated with veterinary input and free from harsh synthetic
+          pesticides.
         </p>
         <Button asChild className="bg-[#B89B6A] text-white hover:bg-[#A08858]">
-          <a href="https://celsiusherbs.com/products/petglow-drops">
-            Try PetGlow Drops →
+          <a href="https://celsiusherbs.com/products/natural-flea-treatment-for-cats">
+            Try PetGlow Flea &amp; Tick Drops →
           </a>
         </Button>
       </section>
