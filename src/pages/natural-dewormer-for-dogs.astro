@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import NaturalDewormerForDogsGuideIsland from "../islands/blog/NaturalDewormerForDogsGuide";
+import {
+  buildNaturalDewormerForDogsFaqJsonLd,
+  buildNaturalDewormerForDogsArticleJsonLd,
+} from "../lib/blog/natural-dewormer-for-dogs-faqs";
+
+// Primary keyword: "natural dewormer for dogs"
+// Lives at: blog.celsiusherbs.com/natural-dewormer-for-dogs
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildNaturalDewormerForDogsArticleJsonLd(),
+    buildNaturalDewormerForDogsFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Natural Dewormer for Dogs: 7 Remedies Rated"
+  description="Natural dewormer for dogs — pumpkin seeds, garlic safety truth, diatomaceous earth, and 2 Ayurvedic herbs with NIH research. Evidence ratings for each."
+  canonical="https://blog.celsiusherbs.com/natural-dewormer-for-dogs"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/natural-dewormer-for-dogs.webp"
+  jsonLd={jsonLd}
+>
+  <NaturalDewormerForDogsGuideIsland client:load />
+</Layout>
