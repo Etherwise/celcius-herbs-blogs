@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatPineappleGuideIsland from "../islands/blog/CanDogsEatPineappleGuide";
+import {
+  buildCanDogsEatPineappleFaqJsonLd,
+  buildCanDogsEatPineappleArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-pineapple-faqs";
+
+// Primary keyword: "can dogs eat pineapple"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-pineapple
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatPineappleArticleJsonLd(),
+    buildCanDogsEatPineappleFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Pineapple? Safe Serving Guide"
+  description="Can dogs eat pineapple? Yes — in small amounts. Learn safe serving sizes, which parts to avoid, and why canned pineapple is risky for dogs."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-pineapple"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-pineapple.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatPineappleGuideIsland client:load />
+</Layout>
