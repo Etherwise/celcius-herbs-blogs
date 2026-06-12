@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatMangoGuideIsland from "../islands/blog/CanDogsEatMangoGuide";
+import {
+  buildCanDogsEatMangoFaqJsonLd,
+  buildCanDogsEatMangoArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-mango-faqs";
+
+// Primary keyword: "can dogs eat mango"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-mango
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatMangoArticleJsonLd(),
+    buildCanDogsEatMangoFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Mango? Pit, Skin & Safe Serving Guide"
+  description="Can dogs eat mango? Yes — flesh only. Learn why the mango pit is dangerous, how much to serve by weight, and how to prep it safely."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-mango"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-mango.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatMangoGuideIsland client:load />
+</Layout>
