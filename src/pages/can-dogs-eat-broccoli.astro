@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatBroccoliGuideIsland from "../islands/blog/CanDogsEatBroccoliGuide";
+import {
+  buildCanDogsEatBroccoliFaqJsonLd,
+  buildCanDogsEatBroccoliArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-broccoli-faqs";
+
+// Primary keyword: "can dogs eat broccoli"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-broccoli
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatBroccoliArticleJsonLd(),
+    buildCanDogsEatBroccoliFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Broccoli? Isothiocyanate Risk & Serving Guide"
+  description="Can dogs eat broccoli? Yes — plain and in small amounts. Learn the isothiocyanate risk in florets, safe serving sizes by weight, and raw vs cooked."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-broccoli"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-broccoli.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatBroccoliGuideIsland client:load />
+</Layout>
