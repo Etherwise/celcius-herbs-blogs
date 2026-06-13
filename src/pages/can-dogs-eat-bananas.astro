@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatBananasGuideIsland from "../islands/blog/CanDogsEatBananasGuide";
+import {
+  buildCanDogsEatBananasFaqJsonLd,
+  buildCanDogsEatBananasArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-bananas-faqs";
+
+// Primary keyword: "can dogs eat bananas"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-bananas
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatBananasArticleJsonLd(),
+    buildCanDogsEatBananasFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Bananas? Peel, Portions & Frozen Treats Guide"
+  description="Can dogs eat bananas? Yes — peeled and portioned. Learn the potassium benefits, peel risks, serving sizes by weight, and a frozen banana treat recipe."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-bananas"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-bananas.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatBananasGuideIsland client:load />
+</Layout>
