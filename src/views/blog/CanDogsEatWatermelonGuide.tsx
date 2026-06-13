@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  ArrowLeft,
   CheckCircle,
   Droplets,
   Leaf,
@@ -116,25 +115,6 @@ export default function CanDogsEatWatermelonGuide() {
       {/* Hero */}
       <div className="bg-ink-deep text-primary-foreground">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14">
-
-          {/* Previous articles nav */}
-          <div className="mb-8">
-            <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
-              More articles
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {BLOG_ARTICLES.filter((a) => a.href !== "/can-dogs-eat-watermelon").map((a) => (
-                <a
-                  key={a.href}
-                  href={a.href}
-                  className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                  {a.label}
-                </a>
-              ))}
-            </div>
-          </div>
 
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-1.5 text-xs font-medium tracking-wide uppercase text-primary-foreground/70 mb-6">
@@ -736,6 +716,25 @@ export default function CanDogsEatWatermelonGuide() {
                 your dog's diet or introducing new foods, especially if your
                 dog has a health condition.
               </p>
+            </section>
+
+            {/* More articles */}
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-medium">More articles</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BLOG_ARTICLES.filter((a) => a.href !== "/can-dogs-eat-watermelon").map((a) => (
+                  <a
+                    key={a.href}
+                    href={a.href}
+                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 rounded-full px-4 py-2 transition-colors border border-border"
+                  >
+                    {a.label}
+                  </a>
+                ))}
+              </div>
             </section>
 
           </article>

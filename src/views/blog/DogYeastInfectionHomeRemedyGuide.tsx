@@ -192,24 +192,6 @@ export default function DogYeastInfectionHomeRemedyGuide() {
       <section className="relative overflow-hidden border-b border-border bg-peach">
         <div className="container grid lg:grid-cols-12 gap-10 py-16 lg:py-24 items-center">
           <div className="lg:col-span-7 space-y-6">
-            {/* Previous articles nav */}
-            <div className="mb-8">
-              <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
-                More articles
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {BLOG_ARTICLES.filter((a) => a.href !== "/dog-yeast-infection-home-remedy").map((a) => (
-                  <a
-                    key={a.href}
-                    href={a.href}
-                    className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
-                  >
-                    <ArrowLeft className="w-3 h-3" />
-                    {a.label}
-                  </a>
-                ))}
-              </div>
-            </div>
             <div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-ink-deep/70">
               <span className="inline-flex items-center gap-1.5">
                 <Stethoscope className="h-3.5 w-3.5" /> Canine Skin Health
@@ -797,6 +779,25 @@ export default function DogYeastInfectionHomeRemedyGuide() {
               </Button>
             </a>
           </section>
+
+            {/* More articles */}
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-medium">More articles</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BLOG_ARTICLES.filter((a) => a.href !== "/dog-yeast-infection-home-remedy").map((a) => (
+                  <a
+                    key={a.href}
+                    href={a.href}
+                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 rounded-full px-4 py-2 transition-colors border border-border"
+                  >
+                    {a.label}
+                  </a>
+                ))}
+              </div>
+            </section>
         </article>
       </div>
     </div>

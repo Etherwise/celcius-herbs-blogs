@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  ArrowLeft,
   Bug,
   Clock,
   Droplets,
@@ -180,24 +179,6 @@ export default function CatEarInfectionPicturesGuide() {
       {/* Hero */}
       <div className="bg-ink-deep text-primary-foreground">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14">
-          {/* Previous articles nav */}
-          <div className="mb-8">
-            <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
-              More articles
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {BLOG_ARTICLES.filter((a) => a.href !== "/cat-ear-infection-pictures").map((a) => (
-                <a
-                  key={a.href}
-                  href={a.href}
-                  className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                  {a.label}
-                </a>
-              ))}
-            </div>
-          </div>
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-1.5 text-xs font-medium tracking-wide uppercase text-primary-foreground/70 mb-6">
               <Ear className="w-3.5 h-3.5" /> Visual Guide · Cat Ear Health
@@ -784,6 +765,25 @@ export default function CatEarInfectionPicturesGuide() {
                   <li>Endoscopic view of ear mites in cat's ear canal — Hanzaku, CC BY-SA 4.0, commons.wikimedia.org/wiki/File:%D0%9A%D0%BB%D0%B5%D1%89%D0%B8_otodectes_cynotis_%D0%B2_%D0%BD%D0%B0%D1%80%D1%83%D0%B6%D0%BD%D0%BE%D0%BC_%D1%83%D1%85%D0%B5_%D0%BA%D0%BE%D1%88%D0%BA%D0%B8.jpg</li>
                   <li>Malassezia tape cytology (Dif-Quik stain) — Caroldermoid, CC BY-SA 3.0, commons.wikimedia.org/wiki/File:Malassezia_tape_cytology.jpg</li>
                 </ul>
+              </div>
+            </section>
+
+            {/* More articles */}
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-medium">More articles</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BLOG_ARTICLES.filter((a) => a.href !== "/cat-ear-infection-pictures").map((a) => (
+                  <a
+                    key={a.href}
+                    href={a.href}
+                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 rounded-full px-4 py-2 transition-colors border border-border"
+                  >
+                    {a.label}
+                  </a>
+                ))}
               </div>
             </section>
 
