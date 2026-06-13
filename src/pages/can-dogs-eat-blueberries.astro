@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatBlueberriesGuideIsland from "../islands/blog/CanDogsEatBlueberriesGuide";
+import {
+  buildCanDogsEatBlueberriesFaqJsonLd,
+  buildCanDogsEatBlueberriesArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-blueberries-faqs";
+
+// Primary keyword: "can dogs eat blueberries"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-blueberries
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatBlueberriesArticleJsonLd(),
+    buildCanDogsEatBlueberriesFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Blueberries? Antioxidants & Safe Serving Guide"
+  description="Can dogs eat blueberries? Yes — low-calorie and antioxidant-rich. Learn anthocyanins, safe serving sizes by weight, frozen vs fresh, and choking risks."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-blueberries"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-blueberries.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatBlueberriesGuideIsland client:load />
+</Layout>
