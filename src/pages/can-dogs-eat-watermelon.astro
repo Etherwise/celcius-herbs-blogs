@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CanDogsEatWatermelonGuideIsland from "../islands/blog/CanDogsEatWatermelonGuide";
+import {
+  buildCanDogsEatWatermelonFaqJsonLd,
+  buildCanDogsEatWatermelonArticleJsonLd,
+} from "../lib/blog/can-dogs-eat-watermelon-faqs";
+
+// Primary keyword: "can dogs eat watermelon"
+// Lives at: blog.celsiusherbs.com/can-dogs-eat-watermelon
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    buildCanDogsEatWatermelonArticleJsonLd(),
+    buildCanDogsEatWatermelonFaqJsonLd(),
+  ],
+};
+---
+
+<Layout
+  title="Can Dogs Eat Watermelon? Seeds, Rind & Serving Guide"
+  description="Can dogs eat watermelon? Yes — flesh only. Learn why seeds cause blockages, why rind upsets digestion, hydration benefits, and safe serving sizes."
+  canonical="https://blog.celsiusherbs.com/can-dogs-eat-watermelon"
+  ogType="article"
+  ogImage="https://blog.celsiusherbs.com/og/can-dogs-eat-watermelon.webp"
+  jsonLd={jsonLd}
+>
+  <CanDogsEatWatermelonGuideIsland client:load />
+</Layout>
