@@ -17,6 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { CAN_DOGS_EAT_WATERMELON_FAQS as FAQS } from "@/lib/blog/can-dogs-eat-watermelon-faqs";
+import { BLOG_ARTICLES } from "@/lib/blog/recent-articles";
 import { ReviewedByDrAlex } from "@/components/blog/ReviewedByDrAlex";
 import { LiteYouTube } from "@/components/LiteYouTube";
 
@@ -36,14 +37,6 @@ const SECTIONS: Section[] = [
   { id: "video", label: "Dr. Alex video" },
   { id: "faq", label: "FAQs" },
   { id: "references", label: "References" },
-];
-
-const RECENT_ARTICLES = [
-  { href: "/can-dogs-eat-blueberries", label: "Can Dogs Eat Blueberries?" },
-  { href: "/can-dogs-eat-broccoli", label: "Can Dogs Eat Broccoli?" },
-  { href: "/can-dogs-eat-bananas", label: "Can Dogs Eat Bananas?" },
-  { href: "/can-dogs-eat-mango", label: "Can Dogs Eat Mango?" },
-  { href: "/natural-pain-relief-for-dogs", label: "Natural Pain Relief for Dogs" },
 ];
 
 const NUTRITION_ROWS = [
@@ -130,7 +123,7 @@ export default function CanDogsEatWatermelonGuide() {
               More articles
             </p>
             <div className="flex flex-wrap gap-2">
-              {RECENT_ARTICLES.map((a) => (
+              {BLOG_ARTICLES.filter((a) => a.href !== "/can-dogs-eat-watermelon").map((a) => (
                 <a
                   key={a.href}
                   href={a.href}

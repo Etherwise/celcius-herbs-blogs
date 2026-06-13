@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Activity,
+  ArrowLeft,
   Droplet,
   FlaskConical,
   Leaf,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/accordion";
 import { HOME_REMEDIES_FOR_DOG_ALLERGIES_FAQS as FAQS } from "@/lib/blog/home-remedies-for-dog-allergies-faqs";
 import { ReviewedByDrAlex } from "@/components/blog/ReviewedByDrAlex";
+import { BLOG_ARTICLES } from "@/lib/blog/recent-articles";
 
 import imgHero from "@/assets/blog/home-remedies-for-dog-allergies-hero.webp";
 import imgAllergyTypes from "@/assets/blog/home-remedies-for-dog-allergies-allergy-types.webp";
@@ -148,6 +150,24 @@ export default function HomeRemediesForDogAllergiesGuide() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 font-sans text-[#3A2F26]">
+      {/* Previous articles nav */}
+      <div className="mb-8">
+        <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
+          More articles
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {BLOG_ARTICLES.filter((a) => a.href !== "/home-remedies-for-dog-allergies").map((a) => (
+            <a
+              key={a.href}
+              href={a.href}
+              className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              {a.label}
+            </a>
+          ))}
+        </div>
+      </div>
       {/* ── Header ── */}
       <header className="mb-8">
         <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#B89B6A]">

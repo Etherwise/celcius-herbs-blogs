@@ -18,6 +18,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { CAN_DOGS_EAT_BANANAS_FAQS as FAQS } from "@/lib/blog/can-dogs-eat-bananas-faqs";
+import { BLOG_ARTICLES } from "@/lib/blog/recent-articles";
 import { ReviewedByDrAlex } from "@/components/blog/ReviewedByDrAlex";
 import { LiteYouTube } from "@/components/LiteYouTube";
 
@@ -113,12 +114,24 @@ export default function CanDogsEatBananasGuide() {
       {/* Hero */}
       <div className="bg-ink-deep text-primary-foreground">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14">
-          <a
-            href="/"
-            className="inline-flex items-center gap-2 text-primary-foreground/60 hover:text-primary-foreground text-sm mb-8 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to blog
-          </a>
+          {/* Previous articles nav */}
+          <div className="mb-8">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
+              More articles
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {BLOG_ARTICLES.filter((a) => a.href !== "/can-dogs-eat-bananas").map((a) => (
+                <a
+                  key={a.href}
+                  href={a.href}
+                  className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  {a.label}
+                </a>
+              ))}
+            </div>
+          </div>
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-1.5 text-xs font-medium tracking-wide uppercase text-primary-foreground/70 mb-6">
               <Apple className="w-3.5 h-3.5" /> Dog Nutrition · Safe Foods

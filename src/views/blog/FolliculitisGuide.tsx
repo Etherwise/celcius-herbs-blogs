@@ -19,6 +19,7 @@ import {
   Waves,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BLOG_ARTICLES } from "@/lib/blog/recent-articles";
 
 import hero from "@/assets/blog/hero.jpg";
 import bacterial from "@/assets/blog/bacterial.jpg";
@@ -413,6 +414,24 @@ export default function FolliculitisGuide() {
       <section className="relative overflow-hidden border-b border-border bg-peach">
         <div className="container grid lg:grid-cols-12 gap-10 py-16 lg:py-24 items-center">
           <div className="lg:col-span-6 space-y-6">
+            {/* Previous articles nav */}
+            <div className="mb-8">
+              <p className="text-[10px] tracking-[0.2em] uppercase text-primary-foreground/40 font-medium mb-2">
+                More articles
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {BLOG_ARTICLES.filter((a) => a.href !== "/folliculitis").map((a) => (
+                  <a
+                    key={a.href}
+                    href={a.href}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 hover:text-primary-foreground bg-primary-foreground/8 hover:bg-primary-foreground/15 rounded-full px-3 py-1.5 transition-colors border border-primary-foreground/10"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    {a.label}
+                  </a>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-ink-deep/70">
               <span className="inline-flex items-center gap-1.5">
                 <Stethoscope className="h-3.5 w-3.5" /> Dermatology
